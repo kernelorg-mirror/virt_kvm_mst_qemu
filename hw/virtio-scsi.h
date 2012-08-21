@@ -27,6 +27,7 @@
 #define VIRTIO_SCSI_F_CHANGE                   2
 
 struct VirtIOSCSIConf {
+    VHostSCSI *vhost_scsi;
     uint32_t num_queues;
     uint32_t max_sectors;
     uint32_t cmd_per_lun;

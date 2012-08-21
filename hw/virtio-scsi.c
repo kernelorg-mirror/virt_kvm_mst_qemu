@@ -13,9 +13,13 @@
  *
  */
 
+#include "qemu-common.h"
+#include "qemu-error.h"
+#include "vhost-scsi.h"
 #include "virtio-scsi.h"
 #include <hw/scsi.h>
 #include <hw/scsi-defs.h>
+#include "vhost.h"
 
 #define VIRTIO_SCSI_VQ_SIZE     128
 #define VIRTIO_SCSI_CDB_SIZE    32
@@ -139,6 +143,10 @@ typedef struct {
     uint32_t cdb_size;
     int resetting;
     bool events_dropped;
+
+    bool vhost_started;
+    VHostSCSI *vhost_scsi;
+
     VirtQueue *ctrl_vq;
     VirtQueue *event_vq;
     VirtQueue *cmd_vqs[0];
@@ -692,6 +700,38 @@ static struct SCSIBusInfo virtio_scsi_scsi_info = {
     .load_request = virtio_scsi_load_request,
 };
 
+static bool virtio_scsi_started(VirtIOSCSI *s, uint8_t val)
+{
+    return (val & VIRTIO_CONFIG_S_DRIVER_OK) && s->vdev.vm_running;
+}
+
+static void virtio_scsi_set_status(VirtIODevice *vdev, uint8_t val)
+{
+    VirtIOSCSI *s = (VirtIOSCSI *)vdev;
+    bool start = virtio_scsi_started(s, val);
+
+    if (s->vhost_started == start) {
+        return;
+    }
+
+    if (start) {
+        int ret;
+
+        ret = vhost_scsi_start(s->vhost_scsi, vdev);
+        if (ret < 0) {
+            error_report("virtio-scsi: unable to start vhost: %s\n",
+                         strerror(-ret));
+
+            /* There is no userspace virtio-scsi fallback so exit */
+            exit(1);
+        }
+    } else {
+        vhost_scsi_stop(s->vhost_scsi, vdev);
+    }
+
+    s->vhost_started = start;
+}
+
 VirtIODevice *virtio_scsi_init(DeviceState *dev, VirtIOSCSIConf *proxyconf)
 {
     VirtIOSCSI *s;
@@ -705,12 +745,17 @@ VirtIODevice *virtio_scsi_init(DeviceState *dev, VirtIOSCSIConf *proxyconf)
 
     s->qdev = dev;
     s->conf = proxyconf;
+    s->vhost_started = false;
+    s->vhost_scsi = s->conf->vhost_scsi;
 
     /* TODO set up vdev function pointers */
     s->vdev.get_config = virtio_scsi_get_config;
     s->vdev.set_config = virtio_scsi_set_config;
     s->vdev.get_features = virtio_scsi_get_features;
     s->vdev.reset = virtio_scsi_reset;
+    if (s->vhost_scsi) {
+        s->vdev.set_status = virtio_scsi_set_status;
+    }
 
     s->ctrl_vq = virtio_add_queue(&s->vdev, VIRTIO_SCSI_VQ_SIZE,
                                    virtio_scsi_handle_ctrl);
@@ -736,5 +781,9 @@ void virtio_scsi_exit(VirtIODevice *vdev)
 {
     VirtIOSCSI *s = (VirtIOSCSI *)vdev;
     unregister_savevm(s->qdev, "virtio-scsi", s);
+
+    /* This will stop vhost backend if appropriate. */
+    virtio_scsi_set_status(vdev, 0);
+
     virtio_cleanup(vdev);
 }
