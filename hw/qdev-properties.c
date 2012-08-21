@@ -4,6 +4,7 @@
 #include "blockdev.h"
 #include "hw/block-common.h"
 #include "net/hub.h"
+#include "vhost-scsi.h"
 
 void *qdev_get_prop_ptr(DeviceState *dev, Property *prop)
 {
@@ -694,6 +695,46 @@ PropertyInfo qdev_prop_vlan = {
     .print = print_vlan,
     .get   = get_vlan,
     .set   = set_vlan,
+};
+
+/* --- vhost-scsi --- */
+
+static int parse_vhost_scsi_dev(DeviceState *dev, const char *str, void **ptr)
+{
+   VHostSCSI *p;
+
+   p = find_vhost_scsi(str);
+   if (p == NULL) {
+       return -ENOENT;
+   }
+
+   *ptr = p;
+   return 0;
+}
+
+static const char *print_vhost_scsi_dev(void *ptr)
+{
+    VHostSCSI *p = ptr;
+
+    return (p) ? vhost_scsi_get_id(p) : "<null>";
+}
+
+static void get_vhost_scsi_dev(Object *obj, Visitor *v, void *opaque,
+                       const char *name, Error **errp)
+{
+    get_pointer(obj, v, opaque, print_vhost_scsi_dev, name, errp);
+}
+
+static void set_vhost_scsi_dev(Object *obj, Visitor *v, void *opaque,
+                               const char *name, Error **errp)
+{
+    set_pointer(obj, v, opaque, parse_vhost_scsi_dev, name, errp);
+}
+
+PropertyInfo qdev_prop_vhost_scsi = {
+     .name = "vhost-scsi",
+     .get  = get_vhost_scsi_dev,
+     .set  = set_vhost_scsi_dev,
 };
 
 /* --- pointer --- */

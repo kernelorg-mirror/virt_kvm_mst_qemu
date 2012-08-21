@@ -283,6 +283,7 @@ typedef struct EventNotifier EventNotifier;
 typedef struct VirtIODevice VirtIODevice;
 typedef struct QEMUSGList QEMUSGList;
 typedef struct SHPCDevice SHPCDevice;
+typedef struct VHostSCSI VHostSCSI;
 
 typedef uint64_t pcibus_t;
 
