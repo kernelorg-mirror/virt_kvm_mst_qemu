@@ -23,6 +23,9 @@
 #include "qapi/qmp-output-visitor.h"
 #include "qapi/string-input-visitor.h"
 #include "qapi/string-output-visitor.h"
+#include "qapi/ber-input-visitor.h"
+#include "qapi/ber-output-visitor.h"
+#include "migration/qemu-file.h"
 
 typedef struct PrimitiveType {
     union {
@@ -701,6 +704,66 @@ static void string_cleanup(void *datap)
     string_input_visitor_cleanup(d->siv);
 }
 
+
+typedef struct BERSerializeData {
+    BEROutputVisitor *sov;
+    QEMUFile *qoutfile;
+    BERInputVisitor *siv;
+    QEMUFile *qinfile;
+} BERSerializeData;
+
+static void ber_serialize(void *native_in, void **datap,
+                          VisitorFunc visit, Error **errp,
+                          BERLengthEncoding ber_length_encoding)
+{
+    BERSerializeData *d = g_malloc0(sizeof(*d));
+
+    d->qoutfile = qemu_bufopen("w", NULL);
+    d->sov = ber_output_visitor_new(d->qoutfile, ber_length_encoding);
+    visit(ber_output_get_visitor(d->sov), &native_in, errp);
+    *datap = d;
+}
+
+static void ber_definite_serialize(void *native_in, void **datap,
+                                   VisitorFunc visit, Error **errp)
+{
+    ber_serialize(native_in, datap, visit, errp,
+                  BER_LENGTH_ENCODING_DEFINITE);
+}
+
+static void ber_indefinite_serialize(void *native_in, void **datap,
+                                     VisitorFunc visit, Error **errp)
+{
+    ber_serialize(native_in, datap, visit, errp,
+                  BER_LENGTH_ENCODING_INDEFINITE);
+}
+
+static void ber_deserialize(void **native_out, void *datap,
+                               VisitorFunc visit, Error **errp)
+{
+    BERSerializeData *d = datap;
+    const QEMUSizedBuffer *qsb = qemu_buf_get(d->qoutfile);
+    QEMUSizedBuffer *new_qsb = qsb_clone(qsb);
+    g_assert(new_qsb != NULL);
+
+    d->qinfile = qemu_bufopen("r", new_qsb);
+
+    d->siv = ber_input_visitor_new(d->qinfile, ~0);
+    visit(ber_input_get_visitor(d->siv), native_out, errp);
+}
+
+static void ber_cleanup(void *datap)
+{
+    BERSerializeData *d = datap;
+
+    ber_output_visitor_cleanup(d->sov);
+    ber_input_visitor_cleanup(d->siv);
+    qemu_fclose(d->qinfile);
+    qemu_fclose(d->qoutfile);
+    g_free(d);
+}
+
+
 /* visitor registration, test harness */
 
 /* note: to function interchangeably as a serialization mechanism your
@@ -722,6 +785,21 @@ static const SerializeOps visitors[] = {
         .cleanup = string_cleanup,
         .caps = VCAP_PRIMITIVES
     },
+    {
+        .type = "ASN.1 BER indefinite l.e.",
+        .serialize = ber_indefinite_serialize,
+        .deserialize = ber_deserialize,
+        .cleanup = ber_cleanup,
+        .caps = VCAP_PRIMITIVES | VCAP_STRUCTURES | VCAP_LISTS
+    },
+    {
+        .type = "ASN.1 BER definite l.e.",
+        .serialize = ber_definite_serialize,
+        .deserialize = ber_deserialize,
+        .cleanup = ber_cleanup,
+        .caps = VCAP_PRIMITIVES | VCAP_STRUCTURES | VCAP_LISTS
+    },
+
     { NULL }
 };
 
