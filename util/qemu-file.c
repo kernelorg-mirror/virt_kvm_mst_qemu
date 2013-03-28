@@ -1069,6 +1069,64 @@ QEMUSizedBuffer *qsb_clone(const QEMUSizedBuffer *qsb)
     return out;
 }
 
+/**
+ * Write the contents of a QEMUSizedBuffer into a QEMUFile.
+ *
+ * @qsb: A QEMUSizedBuffer
+ * @qfile: QEMUFile to write into
+ * @start: start offset of the data in the @qsb
+ * @count: number of bytes to write into @qfile
+ *
+ * Returns the actual number of bytes that were written,
+ * -EIO in case of an error.
+ */
+ssize_t qsb_qfile_write(const QEMUSizedBuffer *qsb, QEMUFile *qfile,
+                       off_t start, size_t count)
+{
+    size_t all_copy, to_copy;
+    off_t s_off;
+    const struct iovec *iov;
+    ssize_t index;
+    uint8_t *s;
+
+    if (start > qsb->used) {
+        return 0;
+    }
+
+    if (start + count > qsb->used) {
+        count = qsb->used - start;
+    }
+
+    all_copy = count;
+
+    index = qsb_get_iovec(qsb, start, &s_off);
+    if (index < 0) {
+        return 0;
+    }
+
+    while (all_copy > 0) {
+        iov = &qsb->iov[index];
+
+        s = iov->iov_base;
+
+        to_copy = iov->iov_len - s_off;
+        if (to_copy > all_copy) {
+            to_copy = all_copy;
+        }
+
+        if (qemu_write_bytes(qfile, &s[s_off], to_copy) != to_copy) {
+            return -EIO;
+        }
+
+        all_copy -= to_copy;
+
+        s_off = 0;
+        index++;
+    }
+
+    return count;
+}
+
 typedef struct QEMUBuffer {
     QEMUSizedBuffer *qsb;
     QEMUFile *file;

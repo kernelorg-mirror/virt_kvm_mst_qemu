@@ -2844,7 +2844,7 @@ fi
 # Do we need libm
 cat > $TMPC << EOF
 #include <math.h>
-int main(void) { return isnan(sin(0.0)); }
+int main(void) { return isnan(nan("NAN")); }
 EOF
 if compile_prog "" "" ; then
   :
