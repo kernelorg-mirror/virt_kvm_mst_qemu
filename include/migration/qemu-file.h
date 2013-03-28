@@ -98,6 +98,12 @@ void qemu_file_reset_rate_limit(QEMUFile *f);
 void qemu_file_set_rate_limit(QEMUFile *f, int64_t new_rate);
 int64_t qemu_file_get_rate_limit(QEMUFile *f);
 int qemu_file_get_error(QEMUFile *f);
+void qemu_file_set_error(QEMUFile *f, int ret);
+QEMUFile *qemu_fopen_bdrv(BlockDriverState *bs, int is_writable);
+int qemu_peek_buffer(QEMUFile *f, uint8_t *buf, int size, size_t offset);
+int qemu_peek_byte(QEMUFile *f, int offset);
+void qemu_file_skip(QEMUFile *f, int size);
+void qemu_fflush(QEMUFile *f);
 
 static inline void qemu_put_be64s(QEMUFile *f, const uint64_t *pv)
 {
