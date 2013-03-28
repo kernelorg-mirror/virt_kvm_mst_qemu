@@ -24,6 +24,8 @@
 #ifndef QEMU_FILE_H
 #define QEMU_FILE_H 1
 
+#include <stdint.h>
+
 /* This function writes a chunk of data to a file at the given position.
  * The pos argument can be ignored if the file is only being used for
  * streaming.  The handler should try to write all of the data it can.
@@ -58,6 +60,15 @@ typedef struct QEMUFileOps {
     QEMUFileGetFD *get_fd;
 } QEMUFileOps;
 
+struct QEMUSizedBuffer {
+    struct iovec *iov;
+    size_t n_iov;
+    size_t size; /* total allocated size in all iov's */
+    size_t used; /* number of used bytes */
+};
+
+typedef struct QEMUSizedBuffer QEMUSizedBuffer;
+
 QEMUFile *qemu_fopen_ops(void *opaque, const QEMUFileOps *ops);
 QEMUFile *qemu_fopen(const char *filename, const char *mode);
 QEMUFile *qemu_fdopen(int fd, const char *mode);
@@ -71,6 +82,8 @@ void qemu_put_byte(QEMUFile *f, int v);
 int qemu_read_bytes(QEMUFile *f, uint8_t *buf, int size);
 int qemu_peek_bytes(QEMUFile *f, uint8_t *buf, int size, size_t offset);
 int qemu_write_bytes(QEMUFile *f, const uint8_t *buf, int size);
+QEMUFile *qemu_bufopen(const char *mode, QEMUSizedBuffer *input);
+const QEMUSizedBuffer *qemu_buf_get(QEMUFile *f);
 
 static inline void qemu_put_ubyte(QEMUFile *f, unsigned int v)
 {

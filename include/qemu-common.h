@@ -448,4 +448,16 @@ int uleb128_decode_small(const uint8_t *in, uint32_t *n);
 
 void hexdump(const char *buf, FILE *fp, const char *prefix, size_t size);
 
+/* QEMU Sized Buffer */
+#include "include/migration/qemu-file.h"
+QEMUSizedBuffer *qsb_create(const uint8_t *buffer, size_t len);
+QEMUSizedBuffer *qsb_clone(const QEMUSizedBuffer *);
+void qsb_free(QEMUSizedBuffer *);
+size_t qsb_set_length(QEMUSizedBuffer *qsb, size_t length);
+size_t qsb_get_length(const QEMUSizedBuffer *qsb);
+ssize_t qsb_get_buffer(const QEMUSizedBuffer *, off_t start, size_t count,
+                       uint8_t **buf);
+ssize_t qsb_write_at(QEMUSizedBuffer *qsb, const uint8_t *buf,
+                     off_t pos, size_t count);
+
 #endif
