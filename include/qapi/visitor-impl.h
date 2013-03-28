@@ -34,6 +34,9 @@ struct Visitor
     void (*type_str)(Visitor *v, char **obj, const char *name, Error **errp);
     void (*type_number)(Visitor *v, double *obj, const char *name,
                         Error **errp);
+    void (*type_sized_buffer)(Visitor *v, void **obj, const char *name,
+                              size_t elem_count, size_t elem_size,
+                              Error **errp);
 
     /* May be NULL */
     void (*start_optional)(Visitor *v, bool *present, const char *name,

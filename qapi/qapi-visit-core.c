@@ -313,3 +313,11 @@ void input_type_enum(Visitor *v, int *obj, const char *strings[],
     g_free(enum_str);
     *obj = value;
 }
+
+void visit_type_sized_buffer(Visitor *v, void **obj, const char *name,
+                             size_t elem_count, size_t elem_size, Error **errp)
+{
+    if (!error_is_set(errp)) {
+        v->type_sized_buffer(v, obj, name, elem_count, elem_size, errp);
+    }
+}
