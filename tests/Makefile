@@ -23,6 +23,10 @@ check-unit-y += tests/test-string-input-visitor$(EXESUF)
 gcov-files-test-string-input-visitor-y = qapi/string-input-visitor.c
 check-unit-y += tests/test-string-output-visitor$(EXESUF)
 gcov-files-test-string-output-visitor-y = qapi/string-output-visitor.c
+check-unit-y += tests/test-ber-visitor$(EXESUF)
+gcov-files-test-vistor-y = qapi/ber-input-visitor.c
+
+
 check-unit-y += tests/test-coroutine$(EXESUF)
 ifeq ($(CONFIG_WIN32),y)
 gcov-files-test-coroutine-y = coroutine-win32.c
@@ -133,6 +137,15 @@ tests/m48t59-test$(EXESUF): tests/m48t59-test.o
 tests/fdc-test$(EXESUF): tests/fdc-test.o
 tests/hd-geo-test$(EXESUF): tests/hd-geo-test.o
 tests/tmp105-test$(EXESUF): tests/tmp105-test.o
+
+tests/test-ber-visitor.o : QEMU_CFLAGS += -I include/qapi
+
+tests/test-ber-visitor.o: \
+	$(addprefix include/qapi/, ber.h ber-input-visitor.h ber-output-visitor.h) \
+	$(addprefix qapi/, ber-common.c ber-input-visitor.c ber-output-visitor.c)
+tests/test-ber-visitor$(EXESUF): tests/test-ber-visitor.o $(tools-obj-y) \
+	qapi/ber-output-visitor.o qapi/ber-input-visitor.o \
+	qapi/ber-common.o $(block-obj-y) libqemuutil.a libqemustub.a
 
 # QTest rules
 
