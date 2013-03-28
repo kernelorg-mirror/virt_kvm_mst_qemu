@@ -68,6 +68,9 @@ int qemu_fclose(QEMUFile *f);
 int64_t qemu_ftell(QEMUFile *f);
 void qemu_put_buffer(QEMUFile *f, const uint8_t *buf, int size);
 void qemu_put_byte(QEMUFile *f, int v);
+int qemu_read_bytes(QEMUFile *f, uint8_t *buf, int size);
+int qemu_peek_bytes(QEMUFile *f, uint8_t *buf, int size, size_t offset);
+int qemu_write_bytes(QEMUFile *f, const uint8_t *buf, int size);
 
 static inline void qemu_put_ubyte(QEMUFile *f, unsigned int v)
 {

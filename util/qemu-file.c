@@ -713,3 +713,33 @@ uint64_t qemu_get_be64(QEMUFile *f)
     return v;
 }
 
+int qemu_read_bytes(QEMUFile *f, uint8_t *buf, int size)
+{
+    if (qemu_file_get_error(f)) {
+        return -1;
+    }
+    return qemu_get_buffer(f, buf, size);
+}
+
+int qemu_peek_bytes(QEMUFile *f, uint8_t *buf, int size, size_t offset)
+{
+    if (qemu_file_get_error(f)) {
+        return -1;
+    }
+    return qemu_peek_buffer(f, buf, size, offset);
+}
+
+int qemu_write_bytes(QEMUFile *f, const uint8_t *buf, int size)
+{
+    if (qemu_file_get_error(f)) {
+        return -1;
+    }
+
+    qemu_put_buffer(f, buf, size);
+
+    if (qemu_file_get_error(f)) {
+        return -1;
+    }
+
+    return size;
+}
