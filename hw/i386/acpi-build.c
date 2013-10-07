@@ -1041,6 +1041,7 @@ void acpi_build(PcGuestInfo *guest_info, AcpiBuildTables *tables)
     AcpiMiscInfo misc;
     AcpiMcfgInfo mcfg;
     PcPciInfo pci;
+    uint8_t *u;
 
     acpi_get_cpu_info(&cpu);
     acpi_get_pm_info(&pm);
@@ -1090,6 +1091,14 @@ void acpi_build(PcGuestInfo *guest_info, AcpiBuildTables *tables)
     if (acpi_get_mcfg(&mcfg)) {
         acpi_add_table(table_offsets, tables->table_data);
         build_mcfg_q35(tables->table_data, tables->linker, &mcfg);
+    }
+
+    /* Add tables supplied by user (if any) */
+    for (u = acpi_table_first(); u; u = acpi_table_next(u)) {
+        unsigned len = acpi_table_len(u);
+
+        acpi_add_table(table_offsets, tables->table_data);
+        g_array_append_vals(tables->table_data, u, len);
     }
 
     /* RSDT is pointed to by RSDP */
