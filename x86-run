@@ -1,0 +1,41 @@
+#!/bin/bash
+
+qemukvm="${QEMU:-qemu-kvm}"
+qemusystem="${QEMU:-qemu-system-x86_64}"
+if
+	${qemukvm} -device '?' 2>&1 | grep -F -e \"testdev\" -e \"pc-testdev\" > /dev/null;
+then
+	qemu="${qemukvm}"
+else
+	if
+		${qemusystem} -device '?' 2>&1 | grep -F -e \"testdev\" -e \"pc-testdev\" > /dev/null;
+	then
+		qemu="${qemusystem}"
+	else
+		echo QEMU binary ${QEMU} has no support for test device. Exiting.
+		exit 2
+	fi
+fi
+
+if
+	${qemu} -device '?' 2>&1 | grep -F "pci-testdev" > /dev/null;
+then
+	pci_testdev="-device pci-testdev"
+else
+	pci_testdev=""
+fi
+
+if
+	${qemu} -device '?' 2>&1 | grep -F "pc-testdev" > /dev/null;
+then
+	pc_testdev="-device pc-testdev -device isa-debug-exit,iobase=0xf4,iosize=0x4"
+else
+	pc_testdev="-device testdev,chardev=testlog -chardev file,id=testlog,path=msr.out"
+fi
+
+command="${qemu} -enable-kvm $pc_testdev -display none -serial stdio $pci_testdev -kernel"
+echo ${command} "$@"
+${command} "$@"
+ret=$?
+echo Return value from qemu: $ret
+exit $ret
