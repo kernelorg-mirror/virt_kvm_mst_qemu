@@ -149,8 +149,8 @@ static inline int rtc_in(u8 reg)
 
 static inline void rtc_out(u8 reg, u8 val)
 {
-    asm volatile("outb %b1, $0x70; mov %b2, %b1; outb %b1, $0x71"
-		 : "+a"(reg) : "0"(reg), "ri"(val));
+    asm volatile("outb %%al, $0x70; mov %b1, %%al; outb %%al, $0x71"
+		 : "+a"(reg) : "ri"(val));
 }
 
 extern char resume_start, resume_end;
