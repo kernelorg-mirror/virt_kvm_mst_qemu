@@ -71,8 +71,8 @@ static void test_acpi(void)
 #define TEST_CYCLES (10 * G_USEC_PER_SEC / TEST_DELAY)
 
     for (i = 0; i < TEST_CYCLES; ++i) {
-        signature_low = readb(SIGNATURE_OFFSET);
-        signature_high = readl(SIGNATURE_OFFSET + 1);
+        signature_low = readb(BOOT_SECTOR_ADDRESS + SIGNATURE_OFFSET);
+        signature_high = readb(BOOT_SECTOR_ADDRESS + SIGNATURE_OFFSET + 1);
         signature = (signature_high << 8) | signature_low;
         if (signature == SIGNATURE) {
             break;
