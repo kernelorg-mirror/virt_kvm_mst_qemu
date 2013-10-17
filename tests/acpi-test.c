@@ -11,6 +11,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <glib.h>
 #include "libqtest.h"
 
@@ -49,40 +50,38 @@ static uint8_t boot_sector[0x200] = {
     [0x1FF] = 0xAA,
 };
 
-static void test_a_boot_order(const char *machine,
-                              const char *test_args,
-                              uint64_t (*read_boot_order)(void),
-                              uint64_t expected_boot,
-                              uint64_t expected_reboot)
+static void test_acpi(void)
 {
+    const char *disk = "tests/acpi-test-disk.raw";
+    FILE *f = fopen(disk, "w");
     char *args;
-    uint64_t actual;
+    uint8_t signature_low;
+    uint8_t signature_high;
+    uint16_t signature;
+    int i;
 
-    args = g_strdup_printf("-nodefaults -display none%s%s %s",
-                           machine ? " -M " : "",
-                           machine ?: "",
-                           test_args);
-    qtest_start(args);
-    actual = read_boot_order();
-    g_assert_cmphex(actual, ==, expected_boot);
-    qmp("{ 'execute': 'system_reset' }");
-    /*
-     * system_reset only requests reset.  We get a RESET event after
-     * the actual reset completes.  Need to wait for that.
-     */
-    qmp("");                    /* HACK: wait for event */
-    actual = read_boot_order();
-    g_assert_cmphex(actual, ==, expected_reboot);
-    qtest_quit(global_qtest);
-    g_free(args);
-}
-
-static void test_pc_boot_order(void)
-{
-    FILE *f = fopen("tests/acpi-test-disk.raw", "w");
     fwrite(boot_sector, 1, sizeof boot_sector, f);
     fclose(f);
-    test_boot_orders(NULL, read_boot_order_pc, test_cases_pc);
+
+    args = g_strdup_printf("-net none -display none %s", disk);
+    qtest_start(args);
+
+   /* Wait at most 10 seconds */
+#define TEST_DELAY (1 * G_USEC_PER_SEC / 10)
+#define TEST_CYCLES (10 * G_USEC_PER_SEC / TEST_DELAY)
+
+    for (i = 0; i < TEST_CYCLES; ++i) {
+        signature_low = readb(SIGNATURE_OFFSET);
+        signature_high = readl(SIGNATURE_OFFSET + 1);
+        signature = (signature_high << 8) | signature_low;
+        if (signature == SIGNATURE) {
+            break;
+        }
+        g_usleep(TEST_DELAY);
+    }
+    g_assert_cmphex(signature, ==, SIGNATURE);
+    qtest_quit(global_qtest);
+    g_free(args);
 }
 
 int main(int argc, char *argv[])
@@ -92,7 +91,7 @@ int main(int argc, char *argv[])
     g_test_init(&argc, &argv, NULL);
 
     if (strcmp(arch, "i386") == 0 || strcmp(arch, "x86_64") == 0) {
-        qtest_add_func("boot-order/pc", test_pc_boot_order);
+        qtest_add_func("acpi/pc", test_acpi);
     }
     return g_test_run();
 }
