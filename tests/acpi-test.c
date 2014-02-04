@@ -153,7 +153,7 @@ static void free_test_data(test_data *data)
             g_free(temp->aml);
         }
         if (temp->aml_file) {
-            if (g_strstr_len(temp->aml_file, -1, "aml-")) {
+            if (!temp->asl_file_retain && g_strstr_len(temp->aml_file, -1, "aml-")) {
                 unlink(temp->aml_file);
             }
             g_free(temp->aml_file);
