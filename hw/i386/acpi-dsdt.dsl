@@ -80,6 +80,8 @@ DefinitionBlock (
             Name(_HID, EisaId("PNP0A03"))
             Name(_ADR, 0x00)
             Name(_UID, 1)
+#define PX13 S0B_
+            External(PX13, DeviceObj)
         }
     }
 
@@ -88,42 +90,11 @@ DefinitionBlock (
 
 
 /****************************************************************
- * VGA
- ****************************************************************/
-
-    Scope(\_SB.PCI0) {
-        Device(VGA) {
-            Name(_ADR, 0x00020000)
-            OperationRegion(PCIC, PCI_Config, Zero, 0x4)
-            Field(PCIC, DWordAcc, NoLock, Preserve) {
-                VEND, 32
-            }
-            Method(_S1D, 0, NotSerialized) {
-                Return (0x00)
-            }
-            Method(_S2D, 0, NotSerialized) {
-                Return (0x00)
-            }
-            Method(_S3D, 0, NotSerialized) {
-                If (LEqual(VEND, 0x1001b36)) {
-                    Return (0x03)           // QXL
-                } Else {
-                    Return (0x00)
-                }
-            }
-        }
-    }
-
-
-/****************************************************************
  * PIIX4 PM
  ****************************************************************/
 
-    Scope(\_SB.PCI0) {
-        Device(PX13) {
-            Name(_ADR, 0x00010003)
+    Scope(\_SB.PCI0.PX13) {
             OperationRegion(P13C, PCI_Config, 0x00, 0xff)
-        }
     }
 
 
@@ -132,7 +103,11 @@ DefinitionBlock (
  ****************************************************************/
 
     Scope(\_SB.PCI0) {
-        Device(ISA) {
+
+#define ISA S08_
+        External(ISA, DeviceObj)
+
+        Scope(ISA) {
             Name(_ADR, 0x00010000)
 
             /* PIIX PCI to ISA irq remapping */
