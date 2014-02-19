@@ -644,19 +644,16 @@ static inline char acpi_get_hex(uint32_t val)
 #define ACPI_PCIHP_AML (ssdp_pcihp_aml + *ssdt_pcihp_start)
 
 #define ACPI_PCINOHP_OFFSET_HEX (*ssdt_pcinohp_name - *ssdt_pcinohp_start + 1)
-#define ACPI_PCINOHP_OFFSET_ID (*ssdt_pcinohp_id - *ssdt_pcinohp_start)
 #define ACPI_PCINOHP_OFFSET_ADR (*ssdt_pcinohp_adr - *ssdt_pcinohp_start)
 #define ACPI_PCINOHP_SIZEOF (*ssdt_pcinohp_end - *ssdt_pcinohp_start)
 #define ACPI_PCINOHP_AML (ssdp_pcihp_aml + *ssdt_pcinohp_start)
 
 #define ACPI_PCIVGA_OFFSET_HEX (*ssdt_pcivga_name - *ssdt_pcivga_start + 1)
-#define ACPI_PCIVGA_OFFSET_ID (*ssdt_pcivga_id - *ssdt_pcivga_start)
 #define ACPI_PCIVGA_OFFSET_ADR (*ssdt_pcivga_adr - *ssdt_pcivga_start)
 #define ACPI_PCIVGA_SIZEOF (*ssdt_pcivga_end - *ssdt_pcivga_start)
 #define ACPI_PCIVGA_AML (ssdp_pcihp_aml + *ssdt_pcivga_start)
 
 #define ACPI_PCIQXL_OFFSET_HEX (*ssdt_pciqxl_name - *ssdt_pciqxl_start + 1)
-#define ACPI_PCIQXL_OFFSET_ID (*ssdt_pciqxl_id - *ssdt_pciqxl_start)
 #define ACPI_PCIQXL_OFFSET_ADR (*ssdt_pciqxl_adr - *ssdt_pciqxl_start)
 #define ACPI_PCIQXL_SIZEOF (*ssdt_pciqxl_end - *ssdt_pciqxl_start)
 #define ACPI_PCIQXL_AML (ssdp_pcihp_aml + *ssdt_pciqxl_start)
@@ -701,7 +698,6 @@ static void patch_pcinohp(int slot, uint8_t *ssdt_ptr)
 
     ssdt_ptr[ACPI_PCINOHP_OFFSET_HEX] = acpi_get_hex(devfn >> 4);
     ssdt_ptr[ACPI_PCINOHP_OFFSET_HEX + 1] = acpi_get_hex(devfn);
-    ssdt_ptr[ACPI_PCINOHP_OFFSET_ID] = slot;
     ssdt_ptr[ACPI_PCINOHP_OFFSET_ADR + 2] = slot;
 }
 
@@ -711,7 +707,6 @@ static void patch_pcivga(int slot, uint8_t *ssdt_ptr)
 
     ssdt_ptr[ACPI_PCIVGA_OFFSET_HEX] = acpi_get_hex(devfn >> 4);
     ssdt_ptr[ACPI_PCIVGA_OFFSET_HEX + 1] = acpi_get_hex(devfn);
-    ssdt_ptr[ACPI_PCIVGA_OFFSET_ID] = slot;
     ssdt_ptr[ACPI_PCIVGA_OFFSET_ADR + 2] = slot;
 }
 
@@ -721,7 +716,6 @@ static void patch_pciqxl(int slot, uint8_t *ssdt_ptr)
 
     ssdt_ptr[ACPI_PCIQXL_OFFSET_HEX] = acpi_get_hex(devfn >> 4);
     ssdt_ptr[ACPI_PCIQXL_OFFSET_HEX + 1] = acpi_get_hex(devfn);
-    ssdt_ptr[ACPI_PCIQXL_OFFSET_ID] = slot;
     ssdt_ptr[ACPI_PCIQXL_OFFSET_ADR + 2] = slot;
 }
 
