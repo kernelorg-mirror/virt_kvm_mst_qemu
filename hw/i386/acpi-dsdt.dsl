@@ -80,8 +80,8 @@ DefinitionBlock (
             Name(_HID, EisaId("PNP0A03"))
             Name(_ADR, 0x00)
             Name(_UID, 1)
-#define PX13 S0B_
-            External(PX13, DeviceObj)
+//#define PX13 S0B_
+//            External(PX13, DeviceObj)
         }
     }
 
@@ -93,8 +93,11 @@ DefinitionBlock (
  * PIIX4 PM
  ****************************************************************/
 
-    Scope(\_SB.PCI0.PX13) {
+    Scope(\_SB.PCI0) {
+        Device(PX13) {
+            Name(_ADR, 0x00010003)
             OperationRegion(P13C, PCI_Config, 0x00, 0xff)
+        }
     }
 
 
@@ -104,10 +107,11 @@ DefinitionBlock (
 
     Scope(\_SB.PCI0) {
 
-#define ISA S08_
         External(ISA, DeviceObj)
 
-        Scope(ISA) {
+        Device(ISA) {
+            Name(_ADR, 0x00010000)
+
             /* PIIX PCI to ISA irq remapping */
             OperationRegion(P40C, PCI_Config, 0x60, 0x04)
 

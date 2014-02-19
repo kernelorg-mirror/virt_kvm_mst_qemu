@@ -786,6 +786,7 @@ static void build_pci_bus_end(PCIBus *bus, void *bus_state)
     GArray *bus_table = build_alloc_array();
     DECLARE_BITMAP(slot_hotplug_enable, PCI_SLOT_MAX);
     DECLARE_BITMAP(slot_device_present, PCI_SLOT_MAX);
+    DECLARE_BITMAP(slot_device_system, PCI_SLOT_MAX);
     DECLARE_BITMAP(slot_device_vga, PCI_SLOT_MAX);
     DECLARE_BITMAP(slot_device_qxl, PCI_SLOT_MAX);
     uint8_t op;
@@ -822,10 +823,11 @@ static void build_pci_bus_end(PCIBus *bus, void *bus_state)
     }
 
     memset(slot_device_present, 0x00, sizeof slot_device_present);
+    memset(slot_device_system, 0x00, sizeof slot_device_present);
     memset(slot_device_vga, 0x00, sizeof slot_device_vga);
     memset(slot_device_qxl, 0x00, sizeof slot_device_qxl);
 
-    for (i = 0; i < ARRAY_SIZE(bus->devices); ++i) {
+    for (i = 0; i < ARRAY_SIZE(bus->devices); i += PCI_FUNC_MAX) {
         DeviceClass *dc;
         PCIDeviceClass *pc;
         PCIDevice *pdev = bus->devices[i];
@@ -838,6 +840,10 @@ static void build_pci_bus_end(PCIBus *bus, void *bus_state)
         set_bit(slot, slot_device_present);
         pc = PCI_DEVICE_GET_CLASS(pdev);
         dc = DEVICE_GET_CLASS(pdev);
+
+        if (pc->class_id == PCI_CLASS_BRIDGE_ISA) {
+            set_bit(slot, slot_device_system);
+        }
 
         if (pc->class_id == PCI_CLASS_DISPLAY_VGA) {
             set_bit(slot, slot_device_vga);
@@ -852,12 +858,13 @@ static void build_pci_bus_end(PCIBus *bus, void *bus_state)
         }
     }
 
-    /* Append Device object for each slot which supports eject */
+    /* Append Device object for each slot */
     for (i = 0; i < PCI_SLOT_MAX; i++) {
         bool can_eject = test_bit(i, slot_hotplug_enable);
         bool present = test_bit(i, slot_device_present);
         bool vga = test_bit(i, slot_device_vga);
         bool qxl = test_bit(i, slot_device_qxl);
+        bool system = test_bit(i, slot_device_system);
         if (can_eject) {
             void *pcihp = acpi_data_push(bus_table,
                                          ACPI_PCIHP_SIZEOF);
@@ -874,6 +881,8 @@ static void build_pci_bus_end(PCIBus *bus, void *bus_state)
                                          ACPI_PCIVGA_SIZEOF);
             memcpy(pcihp, ACPI_PCIVGA_AML, ACPI_PCIVGA_SIZEOF);
             patch_pcivga(i, pcihp);
+        } else if (system) {
+            /* Nothing to do: system devices are in DSDT. */
         } else if (present) {
             void *pcihp = acpi_data_push(bus_table,
                                          ACPI_PCINOHP_SIZEOF);
