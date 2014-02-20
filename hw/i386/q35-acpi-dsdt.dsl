@@ -72,7 +72,6 @@ DefinitionBlock (
             Name(_ADR, 0x00)
             Name(_UID, 1)
 
-#define ISA SF8_
             External(ISA, DeviceObj)
 
             // _OSC: based on sample of ACPI3.0b spec
@@ -140,8 +139,10 @@ DefinitionBlock (
  * LPC ISA bridge
  ****************************************************************/
 
-    Scope(\_SB.PCI0.ISA) {
+    Scope(\_SB.PCI0) {
         /* PCI D31:f0 LPC ISA bridge */
+        Device(ISA) {
+            Name (_ADR, 0x001F0000)  // _ADR: Address
 
             /* ICH9 PCI to ISA irq remapping */
             OperationRegion(PIRQ, PCI_Config, 0x60, 0x0C)
@@ -164,6 +165,7 @@ DefinitionBlock (
                 LPEN,   1,
                 FDEN,   1
             }
+        }
     }
 
 #define DSDT_APPLESMC_STA q35_dsdt_applesmc_sta
