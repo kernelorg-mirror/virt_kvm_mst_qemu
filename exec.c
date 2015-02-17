@@ -1298,6 +1298,8 @@ int qemu_ram_resize(ram_addr_t base, ram_addr_t newsize, Error **errp)
 
     assert(block);
 
+    newsize = TARGET_PAGE_ALIGN(newsize);
+
     if (block->used_length == newsize) {
         return 0;
     }
