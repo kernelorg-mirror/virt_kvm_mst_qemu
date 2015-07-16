@@ -25,6 +25,9 @@
 
 #define VHOST_MEMORY_MAX_NREGIONS    8
 
+#define VHOST_USER_F_PROTOCOL_FEATURES 30
+#define VHOST_USER_PROTOCOL_FEATURE_MASK 0x0ULL
+
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
     VHOST_USER_GET_FEATURES = 1,
@@ -41,6 +44,8 @@ typedef enum VhostUserRequest {
     VHOST_USER_SET_VRING_KICK = 12,
     VHOST_USER_SET_VRING_CALL = 13,
     VHOST_USER_SET_VRING_ERR = 14,
+    VHOST_USER_GET_PROTOCOL_FEATURES = 15,
+    VHOST_USER_SET_PROTOCOL_FEATURES = 26,
     VHOST_USER_MAX
 } VhostUserRequest;
 
@@ -332,9 +337,56 @@ static int vhost_user_call(struct vhost_dev *dev, unsigned long int request,
 
 static int vhost_user_init(struct vhost_dev *dev, void *opaque)
 {
+    VhostUserMsg msg = { 0 };
+    int err;
+
     assert(dev->vhost_ops->backend_type == VHOST_BACKEND_TYPE_USER);
 
     dev->opaque = opaque;
+
+    msg.request = VHOST_USER_GET_FEATURES;
+    msg.flags = VHOST_USER_VERSION;
+    msg.size = 0;
+
+    err = vhost_user_write(dev, &msg, NULL, 0);
+    if (err < 0) {
+        return err;
+    }
+
+    err = vhost_user_read(dev, &msg);
+    if (err < 0) {
+        return err;
+    }
+
+    if (__virtio_has_feature(msg.u64, VHOST_USER_F_PROTOCOL_FEATURES)) {
+        dev->backend_features |= 1ULL << VHOST_USER_F_PROTOCOL_FEATURES;
+
+        msg.request = VHOST_USER_GET_PROTOCOL_FEATURES;
+        msg.flags = VHOST_USER_VERSION;
+        msg.size = 0;
+
+        err = vhost_user_write(dev, &msg, NULL, 0);
+        if (err < 0) {
+            return err;
+        }
+
+        err = vhost_user_read(dev, &msg);
+        if (err < 0) {
+            return err;
+        }
+
+        dev->protocol_features = msg.u64 & VHOST_USER_PROTOCOL_FEATURE_MASK;
+
+        msg.request = VHOST_USER_SET_PROTOCOL_FEATURES;
+        msg.flags = VHOST_USER_VERSION;
+        msg.u64 = dev->protocol_features;
+        msg.size = sizeof msg.u64;
+
+        err = vhost_user_write(dev, &msg, NULL, 0);
+        if (err < 0) {
+            return err;
+        }
+    }
 
     return 0;
 }
