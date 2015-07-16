@@ -89,35 +89,40 @@ static bool ioeventfd_enabled(void)
     return kvm_enabled() && kvm_eventfds_enabled();
 }
 
-static unsigned long int ioctl_to_vhost_user_request[VHOST_USER_MAX] = {
-    -1,                     /* VHOST_USER_NONE */
-    VHOST_GET_FEATURES,     /* VHOST_USER_GET_FEATURES */
-    VHOST_SET_FEATURES,     /* VHOST_USER_SET_FEATURES */
-    VHOST_SET_OWNER,        /* VHOST_USER_SET_OWNER */
-    VHOST_RESET_OWNER,      /* VHOST_USER_RESET_OWNER */
-    VHOST_SET_MEM_TABLE,    /* VHOST_USER_SET_MEM_TABLE */
-    VHOST_SET_LOG_BASE,     /* VHOST_USER_SET_LOG_BASE */
-    VHOST_SET_LOG_FD,       /* VHOST_USER_SET_LOG_FD */
-    VHOST_SET_VRING_NUM,    /* VHOST_USER_SET_VRING_NUM */
-    VHOST_SET_VRING_ADDR,   /* VHOST_USER_SET_VRING_ADDR */
-    VHOST_SET_VRING_BASE,   /* VHOST_USER_SET_VRING_BASE */
-    VHOST_GET_VRING_BASE,   /* VHOST_USER_GET_VRING_BASE */
-    VHOST_SET_VRING_KICK,   /* VHOST_USER_SET_VRING_KICK */
-    VHOST_SET_VRING_CALL,   /* VHOST_USER_SET_VRING_CALL */
-    VHOST_SET_VRING_ERR     /* VHOST_USER_SET_VRING_ERR */
-};
-
 static VhostUserRequest vhost_user_request_translate(unsigned long int request)
 {
-    VhostUserRequest idx;
-
-    for (idx = 0; idx < VHOST_USER_MAX; idx++) {
-        if (ioctl_to_vhost_user_request[idx] == request) {
-            break;
-        }
+    switch (request) {
+    case VHOST_GET_FEATURES:
+        return VHOST_USER_GET_FEATURES;
+    case VHOST_SET_FEATURES:
+        return VHOST_USER_SET_FEATURES;
+    case VHOST_SET_OWNER:
+        return VHOST_USER_SET_OWNER;
+    case VHOST_RESET_OWNER:
+        return VHOST_USER_RESET_OWNER;
+    case VHOST_SET_MEM_TABLE:
+        return VHOST_USER_SET_MEM_TABLE;
+    case VHOST_SET_LOG_BASE:
+        return VHOST_USER_SET_LOG_BASE;
+    case VHOST_SET_LOG_FD:
+        return VHOST_USER_SET_LOG_FD;
+    case VHOST_SET_VRING_NUM:
+        return VHOST_USER_SET_VRING_NUM;
+    case VHOST_SET_VRING_ADDR:
+        return VHOST_USER_SET_VRING_ADDR;
+    case VHOST_SET_VRING_BASE:
+        return VHOST_USER_SET_VRING_BASE;
+    case VHOST_GET_VRING_BASE:
+        return VHOST_USER_GET_VRING_BASE;
+    case VHOST_SET_VRING_KICK:
+        return VHOST_USER_SET_VRING_KICK;
+    case VHOST_SET_VRING_CALL:
+        return VHOST_USER_SET_VRING_CALL;
+    case VHOST_SET_VRING_ERR:
+        return VHOST_USER_SET_VRING_ERR;
+    default:
+        return VHOST_USER_MAX;
     }
-
-    return (idx == VHOST_USER_MAX) ? VHOST_USER_NONE : idx;
 }
 
 static int vhost_user_read(struct vhost_dev *dev, VhostUserMsg *msg)
@@ -198,22 +203,22 @@ static int vhost_user_call(struct vhost_dev *dev, unsigned long int request,
     msg.flags = VHOST_USER_VERSION;
     msg.size = 0;
 
-    switch (request) {
-    case VHOST_GET_FEATURES:
+    switch (msg_request) {
+    case VHOST_USER_GET_FEATURES:
         need_reply = 1;
         break;
 
-    case VHOST_SET_FEATURES:
-    case VHOST_SET_LOG_BASE:
+    case VHOST_USER_SET_FEATURES:
+    case VHOST_USER_SET_LOG_BASE:
         msg.u64 = *((__u64 *) arg);
         msg.size = sizeof(m.u64);
         break;
 
-    case VHOST_SET_OWNER:
-    case VHOST_RESET_OWNER:
+    case VHOST_USER_SET_OWNER:
+    case VHOST_USER_RESET_OWNER:
         break;
 
-    case VHOST_SET_MEM_TABLE:
+    case VHOST_USER_SET_MEM_TABLE:
         for (i = 0; i < dev->mem->nregions; ++i) {
             struct vhost_memory_region *reg = dev->mem->regions + i;
             ram_addr_t ram_addr;
@@ -246,30 +251,30 @@ static int vhost_user_call(struct vhost_dev *dev, unsigned long int request,
 
         break;
 
-    case VHOST_SET_LOG_FD:
+    case VHOST_USER_SET_LOG_FD:
         fds[fd_num++] = *((int *) arg);
         break;
 
-    case VHOST_SET_VRING_NUM:
-    case VHOST_SET_VRING_BASE:
+    case VHOST_USER_SET_VRING_NUM:
+    case VHOST_USER_SET_VRING_BASE:
         memcpy(&msg.state, arg, sizeof(struct vhost_vring_state));
         msg.size = sizeof(m.state);
         break;
 
-    case VHOST_GET_VRING_BASE:
+    case VHOST_USER_GET_VRING_BASE:
         memcpy(&msg.state, arg, sizeof(struct vhost_vring_state));
         msg.size = sizeof(m.state);
         need_reply = 1;
         break;
 
-    case VHOST_SET_VRING_ADDR:
+    case VHOST_USER_SET_VRING_ADDR:
         memcpy(&msg.addr, arg, sizeof(struct vhost_vring_addr));
         msg.size = sizeof(m.addr);
         break;
 
-    case VHOST_SET_VRING_KICK:
-    case VHOST_SET_VRING_CALL:
-    case VHOST_SET_VRING_ERR:
+    case VHOST_USER_SET_VRING_KICK:
+    case VHOST_USER_SET_VRING_CALL:
+    case VHOST_USER_SET_VRING_ERR:
         file = arg;
         msg.u64 = file->index & VHOST_USER_VRING_IDX_MASK;
         msg.size = sizeof(m.u64);
