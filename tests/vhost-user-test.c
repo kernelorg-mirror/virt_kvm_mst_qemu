@@ -272,6 +272,7 @@ static void *thread_function(void *data)
 struct VhostUserTestState {
     CharDriverState *chr;
     char *socket_path;
+    int idx;
 };
 typedef struct VhostUserTestState VhostUserTestState;
 
@@ -397,10 +398,13 @@ static const char *init_hugepagefs(void)
 static void vhost_test_init(VhostUserTestState *test)
 {
     char *chr_path;
+    char *chr_name;
 
-    test->socket_path = g_strdup_printf("/tmp/vhost-%d.sock", getpid());
+    test->socket_path = g_strdup_printf("/tmp/vhost-%d-%d.sock", getpid(), test->idx);
     chr_path = g_strdup_printf("unix:%s,server,nowait", test->socket_path);
-    test->chr = qemu_chr_new("chr0", chr_path, NULL);
+    chr_name = g_strdup_printf("chr%d", test->idx);
+    test->chr = qemu_chr_new(chr_name, chr_path, NULL);
+    g_free(chr_name);
     g_free(chr_path);
     qemu_chr_add_handlers(test->chr, chr_can_read, chr_read, NULL, test);
 }
@@ -417,7 +421,7 @@ int main(int argc, char **argv)
     const char *hugefs = 0;
     char *qemu_cmd = 0;
     int ret;
-    VhostUserTestState test = {};
+    VhostUserTestState test = { .idx = 0 };
 
     g_test_init(&argc, &argv, NULL);
 
