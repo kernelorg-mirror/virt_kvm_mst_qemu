@@ -271,6 +271,7 @@ static void *thread_function(void *data)
 
 struct VhostUserTestState {
     CharDriverState *chr;
+    char *socket_path;
 };
 typedef struct VhostUserTestState VhostUserTestState;
 
@@ -397,7 +398,6 @@ int main(int argc, char **argv)
 {
     QTestState *s = NULL;
     const char *hugefs = 0;
-    char *socket_path = 0;
     char *qemu_cmd = 0;
     char *chr_path = 0;
     int ret;
@@ -412,11 +412,11 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    socket_path = g_strdup_printf("/tmp/vhost-%d.sock", getpid());
+    test.socket_path = g_strdup_printf("/tmp/vhost-%d.sock", getpid());
 
     /* create char dev and add read handlers */
     qemu_add_opts(&qemu_chardev_opts);
-    chr_path = g_strdup_printf("unix:%s,server,nowait", socket_path);
+    chr_path = g_strdup_printf("unix:%s,server,nowait", test.socket_path);
     test.chr = qemu_chr_new("chr0", chr_path, NULL);
     g_free(chr_path);
     qemu_chr_add_handlers(test.chr, chr_can_read, chr_read, NULL, &test);
@@ -426,7 +426,7 @@ int main(int argc, char **argv)
     data_cond = _cond_new();
     _thread_new(NULL, thread_function, NULL);
 
-    qemu_cmd = g_strdup_printf(QEMU_CMD, hugefs, socket_path);
+    qemu_cmd = g_strdup_printf(QEMU_CMD, hugefs, test.socket_path);
     s = qtest_start(qemu_cmd);
     g_free(qemu_cmd);
 
@@ -439,8 +439,8 @@ int main(int argc, char **argv)
     }
 
     /* cleanup */
-    unlink(socket_path);
-    g_free(socket_path);
+    unlink(test.socket_path);
+    g_free(test.socket_path);
     _cond_free(data_cond);
     _mutex_free(data_mutex);
 
