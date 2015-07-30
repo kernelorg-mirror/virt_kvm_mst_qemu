@@ -269,6 +269,11 @@ static void *thread_function(void *data)
     return NULL;
 }
 
+struct VhostUserTestState {
+    CharDriverState *chr;
+};
+typedef struct VhostUserTestState VhostUserTestState;
+
 static int chr_can_read(void *opaque)
 {
     return VHOST_USER_HDR_SIZE;
@@ -276,7 +281,8 @@ static int chr_can_read(void *opaque)
 
 static void chr_read(void *opaque, const uint8_t *buf, int size)
 {
-    CharDriverState *chr = opaque;
+    VhostUserTestState *test = opaque;
+    CharDriverState *chr = test->chr;
     VhostUserMsg msg;
     uint8_t *p = (uint8_t *) &msg;
     int fd;
@@ -390,12 +396,12 @@ static const char *init_hugepagefs(void)
 int main(int argc, char **argv)
 {
     QTestState *s = NULL;
-    CharDriverState *chr = NULL;
     const char *hugefs = 0;
     char *socket_path = 0;
     char *qemu_cmd = 0;
     char *chr_path = 0;
     int ret;
+    VhostUserTestState test = {};
 
     g_test_init(&argc, &argv, NULL);
 
@@ -411,9 +417,9 @@ int main(int argc, char **argv)
     /* create char dev and add read handlers */
     qemu_add_opts(&qemu_chardev_opts);
     chr_path = g_strdup_printf("unix:%s,server,nowait", socket_path);
-    chr = qemu_chr_new("chr0", chr_path, NULL);
+    test.chr = qemu_chr_new("chr0", chr_path, NULL);
     g_free(chr_path);
-    qemu_chr_add_handlers(chr, chr_can_read, chr_read, NULL, chr);
+    qemu_chr_add_handlers(test.chr, chr_can_read, chr_read, NULL, &test);
 
     /* run the main loop thread so the chardev may operate */
     data_mutex = _mutex_new();
