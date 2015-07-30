@@ -394,12 +394,28 @@ static const char *init_hugepagefs(void)
     return path;
 }
 
+static void vhost_test_init(VhostUserTestState *test)
+{
+    char *chr_path;
+
+    test->socket_path = g_strdup_printf("/tmp/vhost-%d.sock", getpid());
+    chr_path = g_strdup_printf("unix:%s,server,nowait", test->socket_path);
+    test->chr = qemu_chr_new("chr0", chr_path, NULL);
+    g_free(chr_path);
+    qemu_chr_add_handlers(test->chr, chr_can_read, chr_read, NULL, test);
+}
+
+static void vhost_test_cleanup(VhostUserTestState *test)
+{
+    unlink(test->socket_path);
+    g_free(test->socket_path);
+}
+
 int main(int argc, char **argv)
 {
     QTestState *s = NULL;
     const char *hugefs = 0;
     char *qemu_cmd = 0;
-    char *chr_path = 0;
     int ret;
     VhostUserTestState test = {};
 
@@ -412,14 +428,10 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    test.socket_path = g_strdup_printf("/tmp/vhost-%d.sock", getpid());
-
     /* create char dev and add read handlers */
     qemu_add_opts(&qemu_chardev_opts);
-    chr_path = g_strdup_printf("unix:%s,server,nowait", test.socket_path);
-    test.chr = qemu_chr_new("chr0", chr_path, NULL);
-    g_free(chr_path);
-    qemu_chr_add_handlers(test.chr, chr_can_read, chr_read, NULL, &test);
+
+    vhost_test_init(&test);
 
     /* run the main loop thread so the chardev may operate */
     data_mutex = _mutex_new();
@@ -439,8 +451,7 @@ int main(int argc, char **argv)
     }
 
     /* cleanup */
-    unlink(test.socket_path);
-    g_free(test.socket_path);
+    vhost_test_cleanup(&test);
     _cond_free(data_cond);
     _mutex_free(data_mutex);
 
