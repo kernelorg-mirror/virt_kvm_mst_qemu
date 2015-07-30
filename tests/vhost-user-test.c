@@ -39,13 +39,15 @@
 #define QEMU_CMD_ACCEL  " -machine accel=tcg"
 #define QEMU_CMD_MEM    " -m 512 -object memory-backend-file,id=mem,size=512M,"\
                         "mem-path=%s,share=on -numa node,memdev=mem"
-#define QEMU_CMD_CHR    " -chardev socket,id=chr0,path=%s"
-#define QEMU_CMD_NETDEV " -netdev vhost-user,id=net0,chardev=chr0,vhostforce"
-#define QEMU_CMD_NET    " -device virtio-net-pci,netdev=net0 "
+#define QEMU_CMD_CHR(i)    " -chardev socket,id=chr" #i ",path=%s"
+#define QEMU_CMD_NETDEV(i) " -netdev vhost-user,id=net" #i ",chardev=chr" #i ",vhostforce"
+#define QEMU_CMD_NET(i)    " -device virtio-net-pci,netdev=net" #i " "
 #define QEMU_CMD_ROM    " -option-rom ../pc-bios/pxe-virtio.rom"
 
-#define QEMU_CMD        QEMU_CMD_ACCEL QEMU_CMD_MEM QEMU_CMD_CHR \
-                        QEMU_CMD_NETDEV QEMU_CMD_NET QEMU_CMD_ROM
+#define QEMU_CMD_VHOST_USER(i) QEMU_CMD_CHR(i) QEMU_CMD_NETDEV(i) QEMU_CMD_NET(i)
+#define QEMU_CMD        QEMU_CMD_ACCEL QEMU_CMD_MEM \
+                        QEMU_CMD_VHOST_USER(0) \
+                        QEMU_CMD_ROM
 
 #define HUGETLBFS_MAGIC       0x958458f6
 
