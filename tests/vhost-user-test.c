@@ -273,6 +273,7 @@ struct VhostUserTestState {
     CharDriverState *chr;
     char *socket_path;
     int idx;
+    bool no_protocol;
 };
 typedef struct VhostUserTestState VhostUserTestState;
 
@@ -308,16 +309,25 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
         msg.flags |= VHOST_USER_REPLY_MASK;
         msg.size = sizeof(m.u64);
         msg.u64 = 0x1ULL << VHOST_USER_F_PROTOCOL_FEATURES;
+	if (test->no_protocol) {
+            msg.u64 &= ~(0x1ULL << VHOST_USER_F_PROTOCOL_FEATURES);
+	}
         p = (uint8_t *) &msg;
         qemu_chr_fe_write_all(chr, p, VHOST_USER_HDR_SIZE + msg.size);
         break;
 
     case VHOST_USER_SET_FEATURES:
-	g_assert_cmpint(msg.u64 & (0x1ULL << VHOST_USER_F_PROTOCOL_FEATURES),
-			!=, 0ULL);
+	if (test->no_protocol) {
+		g_assert_cmpint(msg.u64 & (0x1ULL << VHOST_USER_F_PROTOCOL_FEATURES),
+				==, 0ULL);
+	} else {
+		g_assert_cmpint(msg.u64 & (0x1ULL << VHOST_USER_F_PROTOCOL_FEATURES),
+				!=, 0ULL);
+	}
         break;
 
     case VHOST_USER_GET_PROTOCOL_FEATURES:
+	g_assert(!test->no_protocol);
         /* send back features to qemu */
         msg.flags |= VHOST_USER_REPLY_MASK;
         msg.size = sizeof(m.u64);
@@ -326,6 +336,9 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
         qemu_chr_fe_write_all(chr, p, VHOST_USER_HDR_SIZE + msg.size);
         break;
 
+    case VHOST_USER_SET_PROTOCOL_FEATURES:
+	g_assert(!test->no_protocol);
+        break;
 
     case VHOST_USER_GET_VRING_BASE:
         /* send back vring base to qemu */
