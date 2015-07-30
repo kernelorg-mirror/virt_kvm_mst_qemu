@@ -47,6 +47,7 @@
 #define QEMU_CMD_VHOST_USER(i) QEMU_CMD_CHR(i) QEMU_CMD_NETDEV(i) QEMU_CMD_NET(i)
 #define QEMU_CMD        QEMU_CMD_ACCEL QEMU_CMD_MEM \
                         QEMU_CMD_VHOST_USER(0) \
+                        QEMU_CMD_VHOST_USER(1) \
                         QEMU_CMD_ROM
 
 #define HUGETLBFS_MAGIC       0x958458f6
@@ -434,7 +435,8 @@ int main(int argc, char **argv)
     const char *hugefs = 0;
     char *qemu_cmd = 0;
     int ret;
-    VhostUserTestState test = { .idx = 0 };
+    VhostUserTestState test0 = { .idx = 0 };
+    VhostUserTestState test1 = { .idx = 1, .no_protocol = true };
 
     g_test_init(&argc, &argv, NULL);
 
@@ -448,14 +450,16 @@ int main(int argc, char **argv)
     /* create char dev and add read handlers */
     qemu_add_opts(&qemu_chardev_opts);
 
-    vhost_test_init(&test);
+    vhost_test_init(&test0);
+    vhost_test_init(&test1);
 
     /* run the main loop thread so the chardev may operate */
     data_mutex = _mutex_new();
     data_cond = _cond_new();
     _thread_new(NULL, thread_function, NULL);
 
-    qemu_cmd = g_strdup_printf(QEMU_CMD, hugefs, test.socket_path);
+    qemu_cmd = g_strdup_printf(QEMU_CMD, hugefs,
+               test0.socket_path, test1.socket_path);
     s = qtest_start(qemu_cmd);
     g_free(qemu_cmd);
 
@@ -468,7 +472,8 @@ int main(int argc, char **argv)
     }
 
     /* cleanup */
-    vhost_test_cleanup(&test);
+    vhost_test_cleanup(&test1);
+    vhost_test_cleanup(&test0);
     _cond_free(data_cond);
     _mutex_free(data_mutex);
 
