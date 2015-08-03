@@ -26,7 +26,6 @@ typedef struct VhostUserDevice {
 
 typedef struct VhostUserState {
     NetClientState nc;
-    CharDriverState *chr;
     VhostUserDeviceState *device;
     QTAILQ_ENTRY(VhostUserState) next;
 } VhostUserState;
@@ -138,14 +137,14 @@ static void net_vhost_user_event(void *opaque, int event)
         vhost_user_start(d);
         QTAILQ_FOREACH(s, &d->queues, next) {
             net_vhost_link_down(s, false);
-            error_report("chardev \"%s\" went up", s->chr->label);
         }
+        error_report("chardev \"%s\" went up", d->chr->label);
         break;
     case CHR_EVENT_CLOSED:
         QTAILQ_FOREACH(s, &d->queues, next) {
             net_vhost_link_down(s, true);
-            error_report("chardev \"%s\" went down", s->chr->label);
         }
+        error_report("chardev \"%s\" went down", d->chr->label);
         vhost_user_stop(d);
         break;
     }
@@ -162,6 +161,8 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
 
     QTAILQ_INIT(&d->queues);
 
+    d->chr = chr;
+
     for (i = 0; i < n; i++) {
         nc = qemu_new_net_client(&net_vhost_user_info, peer, device, name);
 
@@ -172,7 +173,6 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
 
         /* We don't provide a receive callback */
         s->nc.receive_disabled = 1;
-        s->chr = chr;
         s->device = d;
 
         QTAILQ_INSERT_TAIL(&d->queues, s, next);
@@ -180,7 +180,7 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
         d->nqueues++;
     }
 
-    qemu_chr_add_handlers(s->chr, NULL, NULL, net_vhost_user_event, d);
+    qemu_chr_add_handlers(d->chr, NULL, NULL, net_vhost_user_event, d);
 
     return 0;
 }
