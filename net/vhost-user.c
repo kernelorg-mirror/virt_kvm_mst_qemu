@@ -15,10 +15,20 @@
 #include "qemu/config-file.h"
 #include "qemu/error-report.h"
 
+typedef struct VhostUserState VhostUserState;
+
+typedef struct VhostUserDevice {
+    CharDriverState *chr;
+    int nqueues;
+    QTAILQ_HEAD(, VhostUserState) queues;
+} VhostUserDeviceState;
+
 typedef struct VhostUserState {
     NetClientState nc;
     CharDriverState *chr;
     VHostNetState *vhost_net;
+    VhostUserDeviceState *device;
+    QTAILQ_ENTRY(VhostUserState) next;
 } VhostUserState;
 
 typedef struct VhostUserChardevProps {
@@ -71,6 +81,14 @@ static void vhost_user_cleanup(NetClientState *nc)
 
     vhost_user_stop(s);
     qemu_purge_queued_packets(nc);
+
+    QTAILQ_REMOVE(&s->device->queues, s, next);
+
+    s->device->nqueues--;
+    if (!s->device->nqueues) {
+        g_free(s->device);
+    }
+    s->device = NULL;
 }
 
 static bool vhost_user_has_vnet_hdr(NetClientState *nc)
@@ -114,18 +132,23 @@ static void net_vhost_link_down(VhostUserState *s, bool link_down)
 
 static void net_vhost_user_event(void *opaque, int event)
 {
-    VhostUserState *s = opaque;
+    VhostUserDeviceState *d = opaque;
+    VhostUserState *s;
 
     switch (event) {
     case CHR_EVENT_OPENED:
-        vhost_user_start(s);
-        net_vhost_link_down(s, false);
-        error_report("chardev \"%s\" went up", s->chr->label);
+        QTAILQ_FOREACH(s, &d->queues, next) {
+            vhost_user_start(s);
+            net_vhost_link_down(s, false);
+            error_report("chardev \"%s\" went up", s->chr->label);
+        }
         break;
     case CHR_EVENT_CLOSED:
-        net_vhost_link_down(s, true);
-        vhost_user_stop(s);
-        error_report("chardev \"%s\" went down", s->chr->label);
+        QTAILQ_FOREACH(s, &d->queues, next) {
+            vhost_user_start(s);
+            net_vhost_link_down(s, true);
+            error_report("chardev \"%s\" went down", s->chr->label);
+        }
         break;
     }
 }
@@ -135,19 +158,31 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
 {
     NetClientState *nc;
     VhostUserState *s;
+    VhostUserDeviceState *d = g_malloc0(sizeof *d);
+    int n = 1;
+    int i;
 
-    nc = qemu_new_net_client(&net_vhost_user_info, peer, device, name);
+    QTAILQ_INIT(&d->queues);
 
-    snprintf(nc->info_str, sizeof(nc->info_str), "vhost-user to %s",
-             chr->label);
+    for (i = 0; i < n; i++) {
+        nc = qemu_new_net_client(&net_vhost_user_info, peer, device, name);
 
-    s = DO_UPCAST(VhostUserState, nc, nc);
+        snprintf(nc->info_str, sizeof(nc->info_str), "vhost-user%d to %s",
+                 i, chr->label);
 
-    /* We don't provide a receive callback */
-    s->nc.receive_disabled = 1;
-    s->chr = chr;
+        s = DO_UPCAST(VhostUserState, nc, nc);
 
-    qemu_chr_add_handlers(s->chr, NULL, NULL, net_vhost_user_event, s);
+        /* We don't provide a receive callback */
+        s->nc.receive_disabled = 1;
+        s->chr = chr;
+        s->device = d;
+
+        QTAILQ_INSERT_HEAD(&d->queues, s, next);
+
+        d->nqueues++;
+    }
+
+    qemu_chr_add_handlers(s->chr, NULL, NULL, net_vhost_user_event, d);
 
     return 0;
 }
