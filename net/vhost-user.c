@@ -21,12 +21,12 @@ typedef struct VhostUserDevice {
     CharDriverState *chr;
     int nqueues;
     QTAILQ_HEAD(, VhostUserState) queues;
+    VHostNetState *vhost_net;
 } VhostUserDeviceState;
 
 typedef struct VhostUserState {
     NetClientState nc;
     CharDriverState *chr;
-    VHostNetState *vhost_net;
     VhostUserDeviceState *device;
     QTAILQ_ENTRY(VhostUserState) next;
 } VhostUserState;
@@ -41,51 +41,49 @@ VHostNetState *vhost_user_get_vhost_net(NetClientState *nc)
 {
     VhostUserState *s = DO_UPCAST(VhostUserState, nc, nc);
     assert(nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER);
-    return s->vhost_net;
+    return s->device->vhost_net;
 }
 
-static int vhost_user_running(VhostUserState *s)
+static int vhost_user_running(VhostUserDeviceState *d)
 {
-    return (s->vhost_net) ? 1 : 0;
+    return d->vhost_net ? 1 : 0;
 }
 
-static int vhost_user_start(VhostUserState *s)
+static int vhost_user_start(VhostUserDeviceState *d)
 {
     VhostNetOptions options;
 
-    if (vhost_user_running(s)) {
-        return 0;
-    }
+    assert(d->nqueues);
 
     options.backend_type = VHOST_BACKEND_TYPE_USER;
-    options.net_backend = &s->nc;
-    options.opaque = s->chr;
+    options.net_backend = &QTAILQ_FIRST(&d->queues)->nc;
+    options.opaque = d->chr;
 
-    s->vhost_net = vhost_net_init(&options);
+    d->vhost_net = vhost_net_init(&options);
 
-    return vhost_user_running(s) ? 0 : -1;
+    return vhost_user_running(d) ? 0 : -1;
 }
 
-static void vhost_user_stop(VhostUserState *s)
+static void vhost_user_stop(VhostUserDeviceState *d)
 {
-    if (vhost_user_running(s)) {
-        vhost_net_cleanup(s->vhost_net);
+    if (vhost_user_running(d)) {
+        vhost_net_cleanup(d->vhost_net);
     }
 
-    s->vhost_net = 0;
+    d->vhost_net = NULL;
 }
 
 static void vhost_user_cleanup(NetClientState *nc)
 {
     VhostUserState *s = DO_UPCAST(VhostUserState, nc, nc);
 
-    vhost_user_stop(s);
     qemu_purge_queued_packets(nc);
 
     QTAILQ_REMOVE(&s->device->queues, s, next);
 
     s->device->nqueues--;
     if (!s->device->nqueues) {
+        vhost_user_stop(s->device);
         g_free(s->device);
     }
     s->device = NULL;
@@ -137,18 +135,18 @@ static void net_vhost_user_event(void *opaque, int event)
 
     switch (event) {
     case CHR_EVENT_OPENED:
+        vhost_user_start(d);
         QTAILQ_FOREACH(s, &d->queues, next) {
-            vhost_user_start(s);
             net_vhost_link_down(s, false);
             error_report("chardev \"%s\" went up", s->chr->label);
         }
         break;
     case CHR_EVENT_CLOSED:
         QTAILQ_FOREACH(s, &d->queues, next) {
-            vhost_user_start(s);
             net_vhost_link_down(s, true);
             error_report("chardev \"%s\" went down", s->chr->label);
         }
+        vhost_user_stop(d);
         break;
     }
 }
@@ -177,7 +175,7 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
         s->chr = chr;
         s->device = d;
 
-        QTAILQ_INSERT_HEAD(&d->queues, s, next);
+        QTAILQ_INSERT_TAIL(&d->queues, s, next);
 
         d->nqueues++;
     }
