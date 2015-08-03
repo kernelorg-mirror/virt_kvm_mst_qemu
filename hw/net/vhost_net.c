@@ -42,7 +42,7 @@
 
 struct vhost_net {
     struct vhost_dev dev;
-    struct vhost_virtqueue vqs[VIRTIO_QUEUE_MAX];
+    struct vhost_virtqueue vqs[2];
     int backend;
     NetClientState *nc;
 };

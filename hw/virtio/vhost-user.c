@@ -26,7 +26,8 @@
 #define VHOST_MEMORY_MAX_NREGIONS    8
 
 #define VHOST_USER_F_PROTOCOL_FEATURES 30
-#define VHOST_USER_PROTOCOL_FEATURE_MASK 0x0ULL
+#define VHOST_USER_PROTOCOL_FEATURE_GET_NVQS 0x2ULL
+#define VHOST_USER_PROTOCOL_FEATURE_MASK (VHOST_USER_PROTOCOL_FEATURE_GET_NVQS)
 
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
@@ -46,6 +47,7 @@ typedef enum VhostUserRequest {
     VHOST_USER_SET_VRING_ERR = 14,
     VHOST_USER_GET_PROTOCOL_FEATURES = 15,
     VHOST_USER_SET_PROTOCOL_FEATURES = 16,
+    VHOST_USER_GET_NVQS = 17,
     VHOST_USER_MAX
 } VhostUserRequest;
 
@@ -386,6 +388,24 @@ static int vhost_user_init(struct vhost_dev *dev, void *opaque)
         if (err < 0) {
             return err;
         }
+
+	if (dev->protocol_features & VHOST_USER_PROTOCOL_FEATURE_GET_NVQS) {
+            msg.request = VHOST_USER_GET_NVQS;
+            msg.flags = VHOST_USER_VERSION;
+            msg.size = 0;
+
+            err = vhost_user_write(dev, &msg, NULL, 0);
+            if (err < 0) {
+                return err;
+            }
+
+            err = vhost_user_read(dev, &msg);
+            if (err < 0) {
+                return err;
+            }
+
+            dev->nvqs = MIN(VIRTIO_QUEUE_MAX - 1, msg.u64);
+	}
     }
 
     return 0;
