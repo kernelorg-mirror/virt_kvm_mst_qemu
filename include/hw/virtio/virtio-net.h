@@ -87,6 +87,7 @@ typedef struct VirtIONet {
     NICConf nic_conf;
     DeviceState *qdev;
     int multiqueue;
+    uint16_t init_queues;
     uint16_t max_queues;
     uint16_t curr_queues;
     size_t config_size;
