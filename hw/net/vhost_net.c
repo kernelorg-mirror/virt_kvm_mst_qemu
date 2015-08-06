@@ -325,19 +325,31 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
         goto err_endian;
     }
 
-    for (i = 0; i < total_queues; i++) {
-        r = vhost_net_start_one(get_vhost_net(ncs[i].peer), dev);
+    if (ncs->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+        r = vhost_net_start_one(get_vhost_net(ncs[0].peer), dev);
 
         if (r < 0) {
             goto err_start;
+        }
+    } else {
+        for (i = 0; i < total_queues; i++) {
+            r = vhost_net_start_one(get_vhost_net(ncs[i].peer), dev);
+
+            if (r < 0) {
+                goto err_start;
+            }
         }
     }
 
     return 0;
 
 err_start:
-    while (--i >= 0) {
-        vhost_net_stop_one(get_vhost_net(ncs[i].peer), dev);
+    if (net->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+        vhost_net_stop_one(get_vhost_net(ncs[0].peer), dev);
+    } else {
+        while (--i >= 0) {
+            vhost_net_stop_one(get_vhost_net(ncs[i].peer), dev);
+        }
     }
     e = k->set_guest_notifiers(qbus->parent, total_queues * 2, false);
     if (e < 0) {
@@ -358,8 +370,12 @@ void vhost_net_stop(VirtIODevice *dev, NetClientState *ncs,
     VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(vbus);
     int i, r;
 
-    for (i = 0; i < total_queues; i++) {
-        vhost_net_stop_one(get_vhost_net(ncs[i].peer), dev);
+    if (net->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+        vhost_net_stop_one(get_vhost_net(ncs[0].peer), dev);
+    } else {
+        for (i = 0; i < total_queues; i++) {
+            vhost_net_stop_one(get_vhost_net(ncs[i].peer), dev);
+        }
     }
 
     r = k->set_guest_notifiers(qbus->parent, total_queues * 2, false);
