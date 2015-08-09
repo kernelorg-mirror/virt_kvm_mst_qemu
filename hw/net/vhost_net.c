@@ -168,6 +168,23 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
     if (r < 0) {
         goto fail;
     }
+
+    /* Reserve 1 VQ for control */
+    if (net->dev.nvqs > VIRTIO_QUEUE_MAX - 1) {
+        net->dev.nvqs = VIRTIO_QUEUE_MAX - 1;
+    }
+    /* Even # of VQs */
+    if (net->dev.nvqs % 2) {
+        net->dev.nvqs = net->dev.nvqs - 1;
+    }
+
+    if (net->dev.nvqs < 2) {
+        fprintf(stderr, "not enough VQs for a working vhost device: %d\n",
+                net->dev.nvqs);
+        vhost_dev_cleanup(&net->dev);
+        goto fail;
+    }
+
     if (backend_kernel) {
         if (!qemu_has_vnet_hdr_len(options->net_backend,
                                sizeof(struct virtio_net_hdr_mrg_rxbuf))) {
@@ -434,7 +451,9 @@ bool vhost_net_single_dev(VHostNetState *net)
 
 int vhost_net_max_queues(VHostNetState *net, int max_queues)
 {
-    return MIN(net->dev.nvqs / 2, max_queues);
+    max_queues = MIN(net->dev.nvqs / 2, max_queues);
+    net->dev.nvqs = max_queues * 2;
+    return max_queues;
 }
 
 void vhost_net_set_queues(VHostNetState *net, int curr_queues)

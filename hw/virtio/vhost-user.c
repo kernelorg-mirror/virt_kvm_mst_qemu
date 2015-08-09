@@ -410,7 +410,7 @@ static int vhost_user_init(struct vhost_dev *dev, void *opaque)
                 return err;
             }
 
-            dev->nvqs = MIN(VIRTIO_QUEUE_MAX - 1, msg.u64);
+            dev->nvqs = MIN(VIRTIO_QUEUE_MAX, msg.u64);
 	}
     }
 
