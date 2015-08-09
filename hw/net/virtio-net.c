@@ -117,16 +117,6 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
     NetClientState *nc = qemu_get_queue(n->nic);
     int queues;
 
-    if (!get_vhost_net(nc->peer)) {
-        return;
-    }
-
-    /* Update max_queues to match what the device supports.
-     * Doing it here is a bit of a hack: it needs to run after backend is
-     * started.
-     */
-    n->max_queues = vhost_net_max_queues(get_vhost_net(nc->peer), n->max_queues);
-
     queues = n->multiqueue ? n->max_queues : 1;
 
     if ((virtio_net_started(n, status) && !nc->peer->link_down) ==
@@ -1577,13 +1567,20 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(dev);
     VirtIONet *n = VIRTIO_NET(dev);
-    NetClientState *nc;
+    NetClientState *nc, *peer;
     int i;
 
     virtio_net_set_config_size(n, n->host_features);
     virtio_init(vdev, "virtio-net", VIRTIO_ID_NET, n->config_size);
 
     n->init_queues = n->max_queues = MAX(n->nic_conf.peers.queues, 1);
+
+    peer = n->nic_conf.peers.ncs[0];
+    if (n->max_queues > 1 && peer && get_vhost_net(peer)) {
+        /* Limit max_queues to match what the device supports. */
+        n->max_queues = vhost_net_max_queues(get_vhost_net(peer), n->max_queues);
+    }
+
     if (n->max_queues * 2 + 1 > VIRTIO_QUEUE_MAX) {
         error_setg(errp, "Invalid number of queues (= %" PRIu32 "), "
                    "must be a positive integer less than %d.",
