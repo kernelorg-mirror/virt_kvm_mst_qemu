@@ -134,7 +134,6 @@ static void net_vhost_user_event(void *opaque, int event)
 
     switch (event) {
     case CHR_EVENT_OPENED:
-        vhost_user_start(d);
         QTAILQ_FOREACH(s, &d->queues, next) {
             net_vhost_link_down(s, false);
         }
@@ -145,7 +144,6 @@ static void net_vhost_user_event(void *opaque, int event)
             net_vhost_link_down(s, true);
         }
         error_report("chardev \"%s\" went down", d->chr->label);
-        vhost_user_stop(d);
         break;
     }
 }
@@ -181,6 +179,7 @@ static int net_vhost_user_init(NetClientState *peer, const char *device,
     }
 
     qemu_chr_add_handlers(d->chr, NULL, NULL, net_vhost_user_event, d);
+    vhost_user_start(d);
 
     return 0;
 }
