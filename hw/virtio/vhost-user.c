@@ -27,7 +27,10 @@
 
 #define VHOST_USER_F_PROTOCOL_FEATURES 30
 #define VHOST_USER_PROTOCOL_FEATURE_GET_NVQS 0x2ULL
-#define VHOST_USER_PROTOCOL_FEATURE_MASK (VHOST_USER_PROTOCOL_FEATURE_GET_NVQS)
+#define VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS 0x4ULL
+#define VHOST_USER_PROTOCOL_FEATURE_MASK \
+    (VHOST_USER_PROTOCOL_FEATURE_GET_NVQS | \
+     VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS)
 
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
@@ -48,6 +51,7 @@ typedef enum VhostUserRequest {
     VHOST_USER_GET_PROTOCOL_FEATURES = 15,
     VHOST_USER_SET_PROTOCOL_FEATURES = 16,
     VHOST_USER_GET_NVQS = 17,
+    VHOST_USER_SET_CURRENT_VQS = 18,
     VHOST_USER_MAX
 } VhostUserRequest;
 
@@ -422,9 +426,26 @@ static int vhost_user_cleanup(struct vhost_dev *dev)
     return 0;
 }
 
+static void vhost_user_set_current_vqs(struct vhost_dev *dev, int curr_vqs)
+{
+    VhostUserMsg msg = { 0 };
+    int err;
+
+    if (dev->protocol_features & VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS) {
+        msg.request = VHOST_USER_SET_CURRENT_VQS;
+        msg.flags = VHOST_USER_VERSION;
+        msg.u64 = curr_vqs;
+        msg.size = sizeof msg.u64;
+
+        err = vhost_user_write(dev, &msg, NULL, 0);
+        assert(err >= 0);
+    }
+}
+
 const VhostOps user_ops = {
         .backend_type = VHOST_BACKEND_TYPE_USER,
         .vhost_call = vhost_user_call,
+        .vhost_backend_set_current_vqs = vhost_user_set_current_vqs,
         .vhost_backend_init = vhost_user_init,
         .vhost_backend_cleanup = vhost_user_cleanup
         };
