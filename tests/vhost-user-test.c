@@ -57,6 +57,11 @@
 #define VHOST_MEMORY_MAX_NREGIONS    8
 
 #define VHOST_USER_F_PROTOCOL_FEATURES 30
+#define VHOST_USER_PROTOCOL_FEATURE_GET_NVQS 0x2ULL
+#define VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS 0x4ULL
+#define VHOST_USER_PROTOCOL_FEATURE_MASK \
+    (VHOST_USER_PROTOCOL_FEATURE_GET_NVQS | \
+     VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS)
 
 typedef enum VhostUserRequest {
     VHOST_USER_NONE = 0,
@@ -277,6 +282,7 @@ struct VhostUserTestState {
     char *socket_path;
     int idx;
     bool no_protocol;
+    uint64_t nvqs;
 };
 typedef struct VhostUserTestState VhostUserTestState;
 
@@ -334,7 +340,7 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
         /* send back features to qemu */
         msg.flags |= VHOST_USER_REPLY_MASK;
         msg.size = sizeof(m.u64);
-        msg.u64 = 0;
+        msg.u64 = VHOST_USER_PROTOCOL_FEATURE_MASK;
         p = (uint8_t *) &msg;
         qemu_chr_fe_write_all(chr, p, VHOST_USER_HDR_SIZE + msg.size);
         break;
@@ -380,7 +386,13 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
         qemu_chr_fe_write_all(chr, p, VHOST_USER_HDR_SIZE + msg.size);
         break;
     case VHOST_USER_SET_CURRENT_VQS:
-        g_assert_cmpint(msg.u64, ==, 2);
+        test->nvqs = msg.u64;
+        /*
+         * This is a non-blocking eventfd.
+         * The receive function forces it to be blocking,
+         * so revert it back to non-blocking.
+         */
+        qemu_set_nonblock(fd);
         break;
     default:
         break;
@@ -479,6 +491,8 @@ int main(int argc, char **argv)
 
     ret = g_test_run();
 
+    g_assert_cmpint(test0.nvqs, ==, 2);
+    g_assert_cmpint(test1.nvqs, ==, 0);
     if (s) {
         qtest_quit(s);
     }
