@@ -436,6 +436,14 @@ int vhost_net_max_queues(VHostNetState *net, int max_queues)
 {
     return MIN(net->dev.nvqs / 2, max_queues);
 }
+
+void vhost_net_set_queues(VHostNetState *net, int curr_queues)
+{
+    if (net->dev.vhost_ops->vhost_backend_set_current_vqs) {
+        net->dev.vhost_ops->vhost_backend_set_current_vqs(&net->dev,
+                                                          curr_queues * 2);
+    }
+}
 #else
 struct vhost_net *vhost_net_init(VhostNetOptions *options)
 {
@@ -490,5 +498,9 @@ bool vhost_net_single_dev(VHostNetState *net)
 int vhost_net_max_queues(VHostNetState *net, int max_queues)
 {
     return -1;
+}
+
+void vhost_net_set_queues(VHostNetState *net, int curr_queues)
+{
 }
 #endif

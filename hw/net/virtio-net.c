@@ -428,10 +428,23 @@ static int peer_detach(VirtIONet *n, int index)
     return tap_disable(nc->peer);
 }
 
+static void virtio_net_vhost_set_queues(VirtIONet *n)
+{
+    NetClientState *nc = qemu_get_queue(n->nic);
+
+    if (!get_vhost_net(nc->peer)) {
+        return;
+    }
+
+    vhost_net_set_queues(get_vhost_net(nc->peer), n->curr_queues);
+}
+
 static void virtio_net_set_queues(VirtIONet *n)
 {
     int i;
     int r;
+
+    virtio_net_vhost_set_queues(n);
 
     for (i = 0; i < n->max_queues; i++) {
         if (i < n->curr_queues) {

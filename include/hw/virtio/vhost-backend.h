@@ -28,6 +28,7 @@ typedef int (*vhost_backend_cleanup)(struct vhost_dev *dev);
 typedef struct VhostOps {
     VhostBackendType backend_type;
     vhost_call vhost_call;
+    void (*vhost_backend_set_current_vqs)(struct vhost_dev *dev, int curr_vqs);
     vhost_backend_init vhost_backend_init;
     vhost_backend_cleanup vhost_backend_cleanup;
 } VhostOps;
