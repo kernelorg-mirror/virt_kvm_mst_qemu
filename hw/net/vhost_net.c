@@ -78,7 +78,6 @@ static const int user_feature_bits[] = {
     VIRTIO_NET_F_HOST_UFO,
     VIRTIO_NET_F_MRG_RXBUF,
     VIRTIO_NET_F_STATUS,
-    VIRTIO_NET_F_CTRL_VQ,
     VIRTIO_NET_F_CTRL_RX,
     VIRTIO_NET_F_CTRL_VLAN,
     VIRTIO_NET_F_CTRL_RX_EXTRA,
