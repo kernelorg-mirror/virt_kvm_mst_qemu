@@ -28,4 +28,5 @@ void vhost_net_virtqueue_mask(VHostNetState *net, VirtIODevice *dev,
                               int idx, bool mask);
 VHostNetState *get_vhost_net(NetClientState *nc);
 bool vhost_net_single_dev(VHostNetState *net);
+int vhost_net_max_queues(VHostNetState *net, int max_queues);
 #endif

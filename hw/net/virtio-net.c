@@ -125,9 +125,7 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
      * Doing it here is a bit of a hack: it needs to run after backend is
      * started.
      */
-    if (vhost_net_single_dev(get_vhost_net(nc->peer))) {
-        n->max_queues = get_vhost_net(nc->peer)->dev.nvqs / 2;
-    }
+    n->max_queues = vhost_net_max_queues(get_vhost_net(nc->peer), n->max_queues);
 
     queues = n->multiqueue ? n->max_queues : 1;
 

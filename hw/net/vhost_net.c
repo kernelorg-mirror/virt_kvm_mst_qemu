@@ -325,7 +325,7 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
         goto err_endian;
     }
 
-    if (ncs->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+    if (vhost_net_single_dev(get_vhost_net(ncs[0].peer))) {
         r = vhost_net_start_one(get_vhost_net(ncs[0].peer), dev);
 
         if (r < 0) {
@@ -344,7 +344,7 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     return 0;
 
 err_start:
-    if (net->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+    if (vhost_net_single_dev(get_vhost_net(ncs[0].peer))) {
         vhost_net_stop_one(get_vhost_net(ncs[0].peer), dev);
     } else {
         while (--i >= 0) {
@@ -370,7 +370,7 @@ void vhost_net_stop(VirtIODevice *dev, NetClientState *ncs,
     VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(vbus);
     int i, r;
 
-    if (net->nc->info->type == NET_CLIENT_OPTIONS_KIND_VHOST_USER) {
+    if (vhost_net_single_dev(get_vhost_net(ncs[0].peer))) {
         vhost_net_stop_one(get_vhost_net(ncs[0].peer), dev);
     } else {
         for (i = 0; i < total_queues; i++) {
@@ -426,9 +426,15 @@ VHostNetState *get_vhost_net(NetClientState *nc)
 
     return vhost_net;
 }
+
 bool vhost_net_single_dev(VHostNetState *net)
 {
     return net->dev.single_dev;
+}
+
+int vhost_net_max_queues(VHostNetState *net, int max_queues)
+{
+    return MIN(net->dev.nvqs / 2, max_queues);
 }
 #else
 struct vhost_net *vhost_net_init(VhostNetOptions *options)
@@ -475,8 +481,14 @@ VHostNetState *get_vhost_net(NetClientState *nc)
 {
     return 0;
 }
+
 bool vhost_net_single_dev(VHostNetState *net)
 {
     return false;
+}
+
+int vhost_net_max_queues(VHostNetState *net, int max_queues)
+{
+    return -1;
 }
 #endif
