@@ -76,6 +76,8 @@ typedef enum VhostUserRequest {
     VHOST_USER_SET_VRING_ERR = 14,
     VHOST_USER_GET_PROTOCOL_FEATURES = 15,
     VHOST_USER_SET_PROTOCOL_FEATURES = 16,
+    VHOST_USER_GET_NVQS = 17,
+    VHOST_USER_SET_CURRENT_VQS = 18,
     VHOST_USER_MAX
 } VhostUserRequest;
 
@@ -369,6 +371,16 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
          * so revert it back to non-blocking.
          */
         qemu_set_nonblock(fd);
+        break;
+    case VHOST_USER_GET_NVQS:
+        msg.flags |= VHOST_USER_REPLY_MASK;
+        msg.size = sizeof(m.u64);
+        msg.u64 = 17; /* Doesn't matter, guest will ack 2 VQs */
+        p = (uint8_t *) &msg;
+        qemu_chr_fe_write_all(chr, p, VHOST_USER_HDR_SIZE + msg.size);
+        break;
+    case VHOST_USER_SET_CURRENT_VQS:
+        g_assert_cmpint(msg.u64, ==, 2);
         break;
     default:
         break;
