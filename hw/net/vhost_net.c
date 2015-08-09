@@ -426,6 +426,10 @@ VHostNetState *get_vhost_net(NetClientState *nc)
 
     return vhost_net;
 }
+bool vhost_net_single_dev(VHostNetState *net)
+{
+    return net->dev.single_dev;
+}
 #else
 struct vhost_net *vhost_net_init(VhostNetOptions *options)
 {
@@ -470,5 +474,9 @@ void vhost_net_virtqueue_mask(VHostNetState *net, VirtIODevice *dev,
 VHostNetState *get_vhost_net(NetClientState *nc)
 {
     return 0;
+}
+bool vhost_net_single_dev(VHostNetState *net)
+{
+    return false;
 }
 #endif

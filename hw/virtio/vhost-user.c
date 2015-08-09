@@ -346,6 +346,8 @@ static int vhost_user_init(struct vhost_dev *dev, void *opaque)
 
     dev->opaque = opaque;
 
+    dev->single_dev = true;
+
     msg.request = VHOST_USER_GET_FEATURES;
     msg.flags = VHOST_USER_VERSION;
     msg.size = 0;

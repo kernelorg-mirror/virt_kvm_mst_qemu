@@ -42,6 +42,7 @@ struct vhost_dev {
     MemoryRegionSection *mem_sections;
     struct vhost_virtqueue *vqs;
     int nvqs;
+    bool single_dev;
     /* the first virtqueue which would be used by this vhost dev */
     int vq_index;
     unsigned long long features;

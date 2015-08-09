@@ -115,11 +115,21 @@ static void virtio_net_vhost_status(VirtIONet *n, uint8_t status)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(n);
     NetClientState *nc = qemu_get_queue(n->nic);
-    int queues = n->multiqueue ? n->max_queues : 1;
+    int queues;
 
     if (!get_vhost_net(nc->peer)) {
         return;
     }
+
+    /* Update max_queues to match what the device supports.
+     * Doing it here is a bit of a hack: it needs to run after backend is
+     * started.
+     */
+    if (vhost_net_single_dev(get_vhost_net(nc->peer))) {
+        n->max_queues = get_vhost_net(nc->peer)->dev.nvqs / 2;
+    }
+
+    queues = n->multiqueue ? n->max_queues : 1;
 
     if ((virtio_net_started(n, status) && !nc->peer->link_down) ==
         !!n->vhost_started) {
