@@ -115,6 +115,7 @@ the ones that do:
  * VHOST_GET_FEATURES
  * VHOST_GET_PROTOCOL_FEATURES
  * VHOST_GET_VRING_BASE
+ * VHOST_USER_GET_NVQS
 
 There are several messages that the master sends with file descriptors passed
 in the ancillary data:
@@ -301,3 +302,36 @@ Message types
       Bits (0-7) of the payload contain the vring index. Bit 8 is the
       invalid FD flag. This flag is set when there is no file descriptor
       in the ancillary data.
+
+ * VHOST_USER_GET_NVQS
+      Id: 17
+      Equivalent ioctl: n/a
+      Master payload: u64
+
+      Only valid if VHOST_USER_PROTOCOL_FEATURE_GET_NVQS
+      protocol feature has been negotiated.
+      Return the max number of VQs supported by slave.
+      For the nextwork device, this includes the TX and RX VQs
+      but not the control VQ.
+
+ * VHOST_USER_SET_CURRENT_VQS
+      Id: 18
+      Equivalent ioctl: n/a
+      Master payload: u64
+
+      Only valid if VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS
+      protocol feature has been negotiated.
+      Set the number of active slave VQs used by master.
+      Note: this message can be re-sent multiple times after device is started.
+      For the nextwork device, this includes the TX and RX VQs but not the
+      control VQ.
+      For the network device, the default (until this message is sent) is 2.
+
+-------------------------------------------------------------------------------
+
+List of valid protocol feature masks:
+#define VHOST_USER_PROTOCOL_FEATURE_GET_NVQS 0x2ULL
+    Indicates support for the VHOST_USER_PROTOCOL_FEATURE_GET_NVQS call
+
+#define VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS 0x4ULL
+    Indicates support for the VHOST_USER_PROTOCOL_FEATURE_SET_CURRENT_NVQS call
