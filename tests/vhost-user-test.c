@@ -272,15 +272,23 @@ static void chr_read(void *opaque, const uint8_t *buf, int size)
     g_mutex_unlock(&data_mutex);
 }
 
-static const char *init_hugepagefs(void)
+static const char *init_hugepagefs(char *template, bool *needunlink)
 {
     const char *path;
     struct statfs fs;
     int ret;
 
+    *needunlink = false;
+
     path = getenv("QTEST_HUGETLBFS_PATH");
     if (!path) {
-        path = "/hugetlbfs";
+        path = mkdtemp(template);
+        if (!path) {
+            g_test_message("mkdtempt on path (%s): %s\n", path, strerror(errno));
+        }
+        g_assert(path);
+        *needunlink = true;
+        return path;
     }
 
     if (access(path, R_OK | W_OK | X_OK)) {
@@ -314,12 +322,14 @@ int main(int argc, char **argv)
     char *qemu_cmd = 0;
     char *chr_path = 0;
     int ret;
+    char path[] = "/tmp/vhost-test-XXXXXX";
+    bool needunlink = false;
 
     g_test_init(&argc, &argv, NULL);
 
     module_call_init(MODULE_INIT_QOM);
 
-    hugefs = init_hugepagefs();
+    hugefs = init_hugepagefs(path, &needunlink);
     if (!hugefs) {
         return 0;
     }
@@ -353,6 +363,14 @@ int main(int argc, char **argv)
     /* cleanup */
     unlink(socket_path);
     g_free(socket_path);
+    if (needunlink) {
+        ret = rmdir(hugefs);
+        if (ret != 0) {
+            g_test_message("unable to rmdir: path (%s): %s\n",
+                           hugefs, strerror(errno));
+        }
+	g_assert_cmpint(ret, ==, 0);
+    }
 
     return ret;
 }
