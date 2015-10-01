@@ -14,14 +14,15 @@
 #include <sys/mman.h>
 #include <assert.h>
 
-void *qemu_ram_mmap(int fd, size_t size, size_t align)
+void *qemu_ram_mmap(int fd, size_t size, size_t align, bool shared)
 {
     /*
      * Note: this always allocates at least one extra page of virtual address
      * space, even if size is already aligned.
      */
     size_t total = size + align;
-    void *ptr = mmap(0, total, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    void *ptr = mmap(0, total, PROT_NONE, (fd == -1 ? MAP_ANONYMOUS : 0) |
+                     (shared ? MAP_SHARED : MAP_PRIVATE), -1, 0);
     size_t offset = QEMU_ALIGN_UP((uintptr_t)ptr, align) - (uintptr_t)ptr;
     void *ptr1;
 
