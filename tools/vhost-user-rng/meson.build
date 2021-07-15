@@ -6,5 +6,5 @@ executable('vhost-user-rng', files(
 
 configure_file(input: '50-qemu-rng.json.in',
                output: '50-qemu-rng.json',
-               configuration: config_host,
+               configuration: { 'libexecdir' : get_option('prefix') / get_option('libexecdir') },
                install_dir: qemu_datadir / 'vhost-user')
