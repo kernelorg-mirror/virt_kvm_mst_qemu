@@ -40,7 +40,7 @@ config VHOST_USER_BLK
     bool
     # Only PCI devices are provided for now
     default y if VIRTIO_PCI
-    depends on VIRTIO && VHOST_USER
+    depends on VIRTIO && VHOST_USER && LINUX
 
 config SWIM
     bool
