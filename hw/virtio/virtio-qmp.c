@@ -396,8 +396,11 @@ static const qmp_virtio_feature_map_t virtio_balloon_feature_map[] = {
     FEATURE_ENTRY(VIRTIO_BALLOON_F_REPORTING, \
             "VIRTIO_BALLOON_F_REPORTING: Page reporting VQ enabled"),
     FEATURE_ENTRY(VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED, \
-            "VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED: Device reports zeroed "
-            "pages"),
+            "VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED: "
+            "Device initializes reported pages"),
+    FEATURE_ENTRY(VIRTIO_BALLOON_F_DEVICE_INIT_ON_INFLATE, \
+            "VIRTIO_BALLOON_F_DEVICE_INIT_ON_INFLATE: "
+            "Device initializes pages on inflate"),
     { -1, "" }
 };
 

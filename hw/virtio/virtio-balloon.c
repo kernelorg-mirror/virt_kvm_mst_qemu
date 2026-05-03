@@ -76,9 +76,9 @@ static bool virtio_balloon_inhibited(void)
             migration_in_bg_snapshot();
 }
 
-static void balloon_inflate_page(VirtIOBalloon *balloon,
-                                 MemoryRegion *mr, hwaddr mr_offset,
-                                 PartiallyBalloonedPage *pbp)
+static int balloon_inflate_page(VirtIOBalloon *balloon,
+                                MemoryRegion *mr, hwaddr mr_offset,
+                                PartiallyBalloonedPage *pbp)
 {
     void *addr = memory_region_get_ram_ptr(mr) + mr_offset;
     ram_addr_t rb_offset, rb_aligned_offset, base_gpa;
@@ -94,11 +94,7 @@ static void balloon_inflate_page(VirtIOBalloon *balloon,
     if (rb_page_size == BALLOON_PAGE_SIZE) {
         /* Easy case */
 
-        ram_block_discard_range(rb, rb_offset, rb_page_size);
-        /* We ignore errors from ram_block_discard_range(), because it
-         * has already reported them, and failing to discard a balloon
-         * page is not fatal */
-        return;
+        return ram_block_discard_range(rb, rb_offset, rb_page_size) == 0;
     }
 
     /* Hard case
@@ -133,12 +129,15 @@ static void balloon_inflate_page(VirtIOBalloon *balloon,
         /* We've accumulated a full host page, we can actually discard
          * it now */
 
-        ram_block_discard_range(rb, rb_aligned_offset, rb_page_size);
-        /* We ignore errors from ram_block_discard_range(), because it
-         * has already reported them, and failing to discard a balloon
-         * page is not fatal */
+        if (ram_block_discard_range(rb, rb_aligned_offset,
+                                    rb_page_size) != 0) {
+            return 0;
+        }
         virtio_balloon_pbp_free(pbp);
+        return subpages;
     }
+
+    return 0;
 }
 
 static void balloon_deflate_page(VirtIOBalloon *balloon,
@@ -410,6 +409,10 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
     VirtIOBalloon *s = VIRTIO_BALLOON(vdev);
     VirtQueueElement *elem;
     MemoryRegionSection section;
+    bool use_bitmap = (vq == s->ivq) &&
+        virtio_vdev_has_feature(vdev,
+                                VIRTIO_BALLOON_F_DEVICE_INIT_ON_INFLATE) &&
+        !s->poison_val;
 
     for (;;) {
         PartiallyBalloonedPage pbp = {};
@@ -419,6 +422,12 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
         elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
         if (!elem) {
             break;
+        }
+
+        bool has_init_bitmap = use_bitmap && elem->in_num > 0;
+        if (has_init_bitmap) {
+            iov_memset(elem->in_sg, elem->in_num, 0, 0,
+                       iov_size(elem->in_sg, elem->in_num));
         }
 
         while (iov_to_buf(elem->out_sg, elem->out_num, offset, &pfn, 4) == 4) {
@@ -446,8 +455,25 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
                                                pa);
             if (!virtio_balloon_inhibited()) {
                 if (vq == s->ivq) {
-                    balloon_inflate_page(s, section.mr,
-                                         section.offset_within_region, &pbp);
+                    int zeroed = balloon_inflate_page(s, section.mr,
+                                         section.offset_within_region,
+                                         &pbp);
+                    if (has_init_bitmap && zeroed) {
+                        int pfn_idx = offset / 4 - 1;
+                        if (zeroed == 1) {
+                            iov_bitmap_set_bit(elem->in_sg, elem->in_num,
+                                               pfn_idx);
+                        } else {
+                            /*
+                             * Large host page: discard covered all
+                             * sub-pages. Set bits for the whole run.
+                             */
+                            int i;
+                            for (i = pfn_idx - zeroed + 1; i <= pfn_idx; i++) {
+                                iov_bitmap_set_bit(elem->in_sg, elem->in_num, i);
+                            }
+                        }
+                    }
                 } else if (vq == s->dvq) {
                     balloon_deflate_page(s, section.mr, section.offset_within_region);
                 } else {
@@ -457,7 +483,8 @@ static void virtio_balloon_handle_output(VirtIODevice *vdev, VirtQueue *vq)
             memory_region_unref(section.mr);
         }
 
-        virtqueue_push(vq, elem, 0);
+        virtqueue_push(vq, elem,
+                       has_init_bitmap ? DIV_ROUND_UP(offset / 4, 8) : 0);
         virtio_notify(vdev, vq);
         g_free(elem);
         virtio_balloon_pbp_free(&pbp);
@@ -1075,6 +1102,8 @@ static const Property virtio_balloon_properties[] = {
                     VIRTIO_BALLOON_F_REPORTING, false),
     DEFINE_PROP_ON_OFF_AUTO("x-device-init-reported", VirtIOBalloon,
                     device_init_reported, ON_OFF_AUTO_AUTO),
+    DEFINE_PROP_BIT("device-init-on-inflate", VirtIOBalloon, host_features,
+                    VIRTIO_BALLOON_F_DEVICE_INIT_ON_INFLATE, false),
     /* QEMU 4.0 accidentally changed the config size even when free-page-hint
      * is disabled, resulting in QEMU 3.1 migration incompatibility.  This
      * property retains this quirk for QEMU 4.1 machine types.
