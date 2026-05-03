@@ -395,6 +395,9 @@ static const qmp_virtio_feature_map_t virtio_balloon_feature_map[] = {
             "VIRTIO_BALLOON_F_PAGE_POISON: Guest page poisoning enabled"),
     FEATURE_ENTRY(VIRTIO_BALLOON_F_REPORTING, \
             "VIRTIO_BALLOON_F_REPORTING: Page reporting VQ enabled"),
+    FEATURE_ENTRY(VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED, \
+            "VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED: Device reports zeroed "
+            "pages"),
     { -1, "" }
 };
 

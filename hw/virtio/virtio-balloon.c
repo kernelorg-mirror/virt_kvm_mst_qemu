@@ -342,9 +342,12 @@ static void virtio_balloon_handle_report(VirtIODevice *vdev, VirtQueue *vq)
 {
     VirtIOBalloon *dev = VIRTIO_BALLOON(vdev);
     VirtQueueElement *elem;
+    bool report_used = virtio_vdev_has_feature(vdev,
+                            VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED);
 
     while ((elem = virtqueue_pop(vq, sizeof(VirtQueueElement)))) {
         unsigned int i;
+        unsigned int used_len = 0;
 
         /*
          * When we discard the page it has the effect of removing the page
@@ -389,11 +392,14 @@ static void virtio_balloon_handle_report(VirtIODevice *vdev, VirtQueue *vq)
                 continue;
             }
 
-            ram_block_discard_range(rb, ram_offset, size);
+            if (!ram_block_discard_range(rb, ram_offset, size) &&
+                report_used) {
+                used_len += size;
+            }
         }
 
 skip_element:
-        virtqueue_push(vq, elem, 0);
+        virtqueue_push(vq, elem, used_len);
         virtio_notify(vdev, vq);
         g_free(elem);
     }
@@ -787,6 +793,26 @@ static uint64_t virtio_balloon_get_features(VirtIODevice *vdev, uint64_t f,
     f |= dev->host_features;
     virtio_add_feature(&f, VIRTIO_BALLOON_F_STATS_VQ);
 
+    switch (dev->device_init_reported) {
+    case ON_OFF_AUTO_ON:
+        if (!virtio_has_feature(f, VIRTIO_BALLOON_F_REPORTING)) {
+            error_setg(errp, "x-device-init-reported=on requires"
+                       " free-page-reporting=on");
+            return f;
+        }
+        virtio_add_feature(&f, VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED);
+        break;
+    case ON_OFF_AUTO_AUTO:
+        if (virtio_has_feature(f, VIRTIO_BALLOON_F_REPORTING)) {
+            virtio_add_feature(&f, VIRTIO_BALLOON_F_DEVICE_INIT_REPORTED);
+        }
+        break;
+    case ON_OFF_AUTO_OFF:
+        break;
+    default:
+        g_assert_not_reached();
+    }
+
     return f;
 }
 
@@ -1047,6 +1073,8 @@ static const Property virtio_balloon_properties[] = {
                     VIRTIO_BALLOON_F_PAGE_POISON, true),
     DEFINE_PROP_BIT("free-page-reporting", VirtIOBalloon, host_features,
                     VIRTIO_BALLOON_F_REPORTING, false),
+    DEFINE_PROP_ON_OFF_AUTO("x-device-init-reported", VirtIOBalloon,
+                    device_init_reported, ON_OFF_AUTO_AUTO),
     /* QEMU 4.0 accidentally changed the config size even when free-page-hint
      * is disabled, resulting in QEMU 3.1 migration incompatibility.  This
      * property retains this quirk for QEMU 4.1 machine types.

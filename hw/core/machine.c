@@ -45,6 +45,7 @@ const size_t hw_compat_11_0_len = G_N_ELEMENTS(hw_compat_11_0);
 GlobalProperty hw_compat_10_2[] = {
     { "scsi-block", "migrate-pr", "off" },
     { "isa-cirrus-vga", "global-vmstate", "true" },
+    { "virtio-balloon-device", "x-device-init-reported", "off" },
 };
 const size_t hw_compat_10_2_len = G_N_ELEMENTS(hw_compat_10_2);
 

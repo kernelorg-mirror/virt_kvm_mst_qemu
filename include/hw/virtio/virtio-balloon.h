@@ -19,6 +19,7 @@
 #include "hw/core/resettable.h"
 #include "hw/virtio/virtio.h"
 #include "system/iothread.h"
+#include "qapi/qapi-types-common.h"
 #include "qom/object.h"
 
 #define TYPE_VIRTIO_BALLOON "virtio-balloon-device"
@@ -71,6 +72,7 @@ struct VirtIOBalloon {
     uint32_t host_features;
 
     uint32_t poison_val;
+    OnOffAuto device_init_reported;
 
     /* State of the resettable container */
     ResettableState reset_state;
