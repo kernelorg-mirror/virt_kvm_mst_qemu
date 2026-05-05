@@ -275,4 +275,18 @@ ssize_t qemu_iovec_compare(QEMUIOVector *a, QEMUIOVector *b);
 void qemu_iovec_clone(QEMUIOVector *dest, const QEMUIOVector *src, void *buf);
 void qemu_iovec_discard_back(QEMUIOVector *qiov, size_t bytes);
 
+/**
+ * Set a bit in a bitmap stored in an iovec.
+ */
+static inline void
+iov_bitmap_set_bit(const struct iovec *iov, unsigned int iov_cnt, int bit)
+{
+    int byte_offset = bit / 8;
+    uint8_t byte_value = 0;
+
+    iov_to_buf(iov, iov_cnt, byte_offset, &byte_value, 1);
+    byte_value |= 1 << (bit & 7);
+    iov_from_buf(iov, iov_cnt, byte_offset, &byte_value, 1);
+}
+
 #endif

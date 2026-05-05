@@ -566,6 +566,42 @@ static void test_discard_back_undo(void)
     iov_free(iov, iov_cnt);
 }
 
+static void test_bitmap_set_bit(void)
+{
+    /* Single contiguous buffer */
+    uint8_t buf[4] = { 0 };
+    struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) };
+
+    iov_bitmap_set_bit(&iov, 1, 0);   /* bit 0 of byte 0 */
+    assert(buf[0] == 0x01);
+
+    iov_bitmap_set_bit(&iov, 1, 7);   /* bit 7 of byte 0 */
+    assert(buf[0] == 0x81);
+
+    iov_bitmap_set_bit(&iov, 1, 8);   /* bit 0 of byte 1 */
+    assert(buf[1] == 0x01);
+
+    iov_bitmap_set_bit(&iov, 1, 31);  /* bit 7 of byte 3 */
+    assert(buf[3] == 0x80);
+
+    /* Idempotent: setting same bit again doesn't change anything */
+    iov_bitmap_set_bit(&iov, 1, 0);
+    assert(buf[0] == 0x81);
+
+    /* Multiple iov segments */
+    uint8_t seg0[1] = { 0 }, seg1[1] = { 0 };
+    struct iovec miov[2] = {
+        { .iov_base = seg0, .iov_len = 1 },
+        { .iov_base = seg1, .iov_len = 1 },
+    };
+
+    iov_bitmap_set_bit(miov, 2, 3);   /* bit 3 in seg0 */
+    assert(seg0[0] == 0x08);
+
+    iov_bitmap_set_bit(miov, 2, 12);  /* bit 4 in seg1 */
+    assert(seg1[0] == 0x10);
+}
+
 int main(int argc, char **argv)
 {
     g_test_init(&argc, &argv, NULL);
@@ -576,5 +612,6 @@ int main(int argc, char **argv)
     g_test_add_func("/basic/iov/discard-back", test_discard_back);
     g_test_add_func("/basic/iov/discard-front-undo", test_discard_front_undo);
     g_test_add_func("/basic/iov/discard-back-undo", test_discard_back_undo);
+    g_test_add_func("/basic/iov/bitmap-set-bit", test_bitmap_set_bit);
     return g_test_run();
 }
