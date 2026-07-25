@@ -30,6 +30,7 @@
 #define VIRTIO_SOUND_STREAM_DEFAULT 2
 #define VIRTIO_SOUND_CHMAP_DEFAULT 0
 #define VIRTIO_SOUND_HDA_FN_NID 0
+#define VIRTIO_SND_PCM_IO_BUF_SIZE (64 * 1024)
 
 static void virtio_snd_pcm_out_cb(void *data, int available);
 static void virtio_snd_process_cmdq(VirtIOSound *s);
@@ -850,7 +851,7 @@ static void virtio_snd_handle_tx_xfer(VirtIODevice *vdev, VirtQueue *vq)
     VirtIOSound *vsnd = VIRTIO_SND(vdev);
     VirtIOSoundPCMBuffer *buffer;
     VirtQueueElement *elem;
-    size_t msg_sz, size, tmp;
+    size_t msg_sz, size, tmp, buf_size;
     virtio_snd_pcm_xfer hdr;
     uint32_t stream_id;
     /*
@@ -894,14 +895,14 @@ static void virtio_snd_handle_tx_xfer(VirtIODevice *vdev, VirtQueue *vq)
             goto tx_err;
         }
 
+        buf_size = MIN(size, VIRTIO_SND_PCM_IO_BUF_SIZE);
         /* Check for g_malloc0 overflow. */
-        if (!g_size_checked_add(&tmp, sizeof(VirtIOSoundPCMBuffer), size)) {
+        if (!g_size_checked_add(&tmp, sizeof(VirtIOSoundPCMBuffer), buf_size)) {
             goto tx_err;
         }
         WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
-            buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
+            buffer = g_malloc0(tmp);
             buffer->elem = elem;
-            buffer->populated = false;
             buffer->vq = vq;
             buffer->size = size;
             buffer->offset = 0;
@@ -936,7 +937,7 @@ static void virtio_snd_handle_rx_xfer(VirtIODevice *vdev, VirtQueue *vq)
     VirtIOSound *vsnd = VIRTIO_SND(vdev);
     VirtIOSoundPCMBuffer *buffer;
     VirtQueueElement *elem;
-    size_t msg_sz, size, tmp;
+    size_t msg_sz, size, tmp, buf_size;
     virtio_snd_pcm_xfer hdr;
     uint32_t stream_id;
     /*
@@ -981,12 +982,13 @@ static void virtio_snd_handle_rx_xfer(VirtIODevice *vdev, VirtQueue *vq)
             goto rx_err;
         }
         size -= sizeof(virtio_snd_pcm_status);
+        buf_size = MIN(size, VIRTIO_SND_PCM_IO_BUF_SIZE);
         /* Check for g_malloc0 overflow. */
-        if (!g_size_checked_add(&tmp, sizeof(VirtIOSoundPCMBuffer), size)) {
+        if (!g_size_checked_add(&tmp, sizeof(VirtIOSoundPCMBuffer), buf_size)) {
             goto rx_err;
         }
         WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
-            buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
+            buffer = g_malloc0(tmp);
             buffer->elem = elem;
             buffer->vq = vq;
             buffer->size = 0;
@@ -1162,7 +1164,7 @@ static void virtio_snd_pcm_out_cb(void *data, int available)
 {
     VirtIOSoundPCMStream *stream = data;
     VirtIOSoundPCMBuffer *buffer;
-    size_t size;
+    size_t size, to_write;
 
     WITH_QEMU_LOCK_GUARD(&stream->queue_mutex) {
         while (!QSIMPLEQ_EMPTY(&stream->queue)) {
@@ -1175,20 +1177,19 @@ static void virtio_snd_pcm_out_cb(void *data, int available)
                 return_tx_buffer(stream, buffer);
                 continue;
             }
-            if (!buffer->populated) {
+            for (;;) {
+                to_write = MIN(buffer->size, VIRTIO_SND_PCM_IO_BUF_SIZE);
+                to_write = MIN(to_write, (size_t)available);
                 iov_to_buf(buffer->elem->out_sg,
                            buffer->elem->out_num,
-                           sizeof(virtio_snd_pcm_xfer),
+                           sizeof(virtio_snd_pcm_xfer) + buffer->offset,
                            buffer->data,
-                           buffer->size);
-                buffer->populated = true;
-            }
-            for (;;) {
+                           to_write);
                 size = audio_be_write(stream->s->audio_be,
-                                 stream->voice.out,
-                                 buffer->data + buffer->offset,
-                                 MIN(buffer->size, available));
-                assert(size <= MIN(buffer->size, available));
+                                      stream->voice.out,
+                                      buffer->data,
+                                      to_write);
+                assert(size <= to_write);
                 if (size == 0) {
                     /* break out of both loops */
                     available = 0;
@@ -1214,8 +1215,7 @@ static void virtio_snd_pcm_out_cb(void *data, int available)
 }
 
 /*
- * Flush all buffer data from this input stream's queue into the driver's
- * virtual queue.
+ * Flush this input stream buffer into the driver's virtual queue.
  *
  * @stream: VirtIOSoundPCMStream *stream
  */
@@ -1225,12 +1225,6 @@ static inline void return_rx_buffer(VirtIOSoundPCMStream *stream,
     virtio_snd_pcm_status resp = { 0 };
     resp.status = cpu_to_le32(VIRTIO_SND_S_OK);
     resp.latency_bytes = 0;
-    /* Copy data -if any- to guest */
-    iov_from_buf(buffer->elem->in_sg,
-                 buffer->elem->in_num,
-                 0,
-                 buffer->data,
-                 buffer->size);
     iov_from_buf(buffer->elem->in_sg,
                  buffer->elem->in_num,
                  buffer->size,
@@ -1285,16 +1279,22 @@ static void virtio_snd_pcm_in_cb(void *data, int available)
                     break;
                 }
                 to_read = stream->params.period_bytes - buffer->size;
+                to_read = MIN(to_read, VIRTIO_SND_PCM_IO_BUF_SIZE);
                 to_read = MIN(to_read, available);
                 to_read = MIN(to_read, max_size - buffer->size);
                 size = audio_be_read(stream->s->audio_be,
                                      stream->voice.in,
-                                     buffer->data + buffer->size,
+                                     buffer->data,
                                      to_read);
                 if (!size) {
                     available = 0;
                     break;
                 }
+                iov_from_buf(buffer->elem->in_sg,
+                             buffer->elem->in_num,
+                             buffer->size,
+                             buffer->data,
+                             size);
                 buffer->size += size;
                 available -= size;
                 if (buffer->size >= stream->params.period_bytes) {

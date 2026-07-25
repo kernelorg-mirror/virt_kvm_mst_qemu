@@ -86,13 +86,14 @@ typedef struct VirtIOSoundPCMBuffer VirtIOSoundPCMBuffer;
  *
  * In the case of TX (i.e. playback) buffers, we defer reading the raw PCM data
  * from the virtqueue until QEMU's sound backsystem calls the output callback.
- * This is tracked by the `bool populated;` field, which is set to true when
- * data has been read into our own buffer for consumption.
+ * This is tracked by the `offset` field, which is advanced as the guest
+ * payload is read into our own buffer for consumption.
  *
  * VirtIOSoundPCMBuffer has a dynamic size since it includes the raw PCM data
  * in its allocation. It must be initialized and destroyed as follows:
  *
- *   size_t size = [[derived from owned VQ element descriptor sizes]];
+ *   size_t size = MIN([[derived from owned VQ element descriptor sizes]],
+ *                     VIRTIO_SND_PCM_IO_BUF_SIZE);
  *   buffer = g_malloc0(sizeof(VirtIOSoundPCMBuffer) + size);
  *   buffer->elem = [[owned VQ element]];
  *
@@ -107,12 +108,10 @@ struct VirtIOSoundPCMBuffer {
     VirtQueue *vq;
     size_t size;
     /*
-     * In TX / Plaback, `offset` represents the first unused position inside
-     * `data`. If `offset == size` then there are no unused data left.
+     * In TX / Plaback, `offset` represents the first unused position in the
+     * guest payload. If `offset == size` then there are no unused data left.
      */
     uint64_t offset;
-    /* Used for the TX queue for lazy I/O copy from `elem` */
-    bool populated;
     /*
      * VirtIOSoundPCMBuffer is an unsized type because it ends with an array of
      * bytes. The size of `data` is determined from the I/O message's read-only
