@@ -976,6 +976,19 @@ static void audio_run_out(AudioMixengBackend *s)
         if (hw->pending_disable && !nb_live) {
             SWVoiceCap *sc;
 
+            /*
+             * Backends using the generic emulation buffer may still have a
+             * rate-limited tail pending after all software voices go empty.
+             * Do not disable the hardware voice until that buffered tail has
+             * been flushed.
+             */
+            if (k->run_buffer_out && hw->pending_emul) {
+                k->run_buffer_out(hw);
+                if (hw->pending_emul) {
+                    continue;
+                }
+            }
+
             trace_audio_out_disable();
             hw->enabled = false;
             hw->pending_disable = false;
